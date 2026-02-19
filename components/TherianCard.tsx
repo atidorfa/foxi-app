@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import type { TherianDTO } from '@/lib/therian-dto'
 import TherianAvatar from './TherianAvatar'
@@ -20,6 +20,14 @@ const STAT_CONFIG = [
   { key: 'charisma' as const, label: 'Carisma',   icon: '✨', color: 'charisma' },
 ]
 
+function timeRemaining(isoString: string): string {
+  const diff = new Date(isoString).getTime() - Date.now()
+  if (diff <= 0) return 'Ya disponible'
+  const h = Math.floor(diff / 3_600_000)
+  const m = Math.floor((diff % 3_600_000) / 60_000)
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
 const RARITY_GLOW: Record<string, string> = {
   COMMON:    'border-white/10',
   RARE:      'border-blue-500/30 shadow-[0_0_30px_rgba(96,165,250,0.1)]',
@@ -33,6 +41,45 @@ export default function TherianCard({ therian: initialTherian }: Props) {
   const [lastDelta, setLastDelta] = useState<{ stat: string; amount: number } | null>(null)
   const [levelUp, setLevelUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Name editing
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState(therian.name ?? '')
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [nameSaving, setNameSaving] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus()
+  }, [editingName])
+
+  const handleNameSave = async () => {
+    const trimmed = nameInput.trim()
+    if (trimmed === therian.name) { setEditingName(false); return }
+    setNameSaving(true)
+    setNameError(null)
+    try {
+      const res = await fetch('/api/therian/name', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setNameError(data.error ?? 'Error al guardar.'); return }
+      setTherian(prev => ({ ...prev, name: data.name }))
+      setNameInput(data.name)
+      setEditingName(false)
+    } catch {
+      setNameError('Error de conexión.')
+    } finally {
+      setNameSaving(false)
+    }
+  }
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleNameSave()
+    if (e.key === 'Escape') { setEditingName(false); setNameInput(therian.name ?? ''); setNameError(null) }
+  }
 
   const handleAction = async (actionType: string) => {
     setError(null)
@@ -87,9 +134,61 @@ export default function TherianCard({ therian: initialTherian }: Props) {
       <div className="relative p-6 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div>
-            {therian.name && (
-              <p className="text-[#8B84B0] text-xs uppercase tracking-widest mb-0.5">{therian.name}</p>
+          <div className="flex-1 min-w-0 pr-3">
+            {/* Nombre editable */}
+            {editingName ? (
+              <div className="mb-2 space-y-1.5">
+                <p className="text-[#8B84B0] text-[10px] uppercase tracking-widest">Nombrando tu Therian...</p>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      ref={nameInputRef}
+                      value={nameInput}
+                      onChange={e => { setNameInput(e.target.value); setNameError(null) }}
+                      onKeyDown={handleNameKeyDown}
+                      maxLength={24}
+                      disabled={nameSaving}
+                      className="w-full bg-white/5 border border-purple-500/50 rounded-xl px-3 py-1.5 text-sm text-white outline-none focus:border-purple-400 focus:bg-purple-950/20 transition-all disabled:opacity-50 placeholder-white/20"
+                      placeholder="Elige un nombre..."
+                      style={{ boxShadow: '0 0 0 0 transparent' }}
+                      onFocus={e => (e.target.style.boxShadow = '0 0 14px rgba(168,85,247,0.25)')}
+                      onBlur={e => (e.target.style.boxShadow = '0 0 0 0 transparent')}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 text-xs">
+                      {nameInput.length}/24
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleNameSave}
+                    disabled={nameSaving || nameInput.trim().length < 2}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+                  >
+                    {nameSaving ? '···' : 'Guardar'}
+                  </button>
+                  <button
+                    onClick={() => { setEditingName(false); setNameInput(therian.name ?? ''); setNameError(null) }}
+                    className="px-2.5 py-1.5 rounded-xl border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 text-sm transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+                {nameError ? (
+                  <p className="text-red-400 text-xs pl-1">{nameError}</p>
+                ) : (
+                  <p className="text-white/20 text-xs pl-1">Enter para guardar · Esc para cancelar</p>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditingName(true)}
+                className="group flex items-center gap-1.5 mb-0.5"
+                title="Cambiar nombre"
+              >
+                <p className="text-[#8B84B0] text-xs uppercase tracking-widest group-hover:text-purple-400/70 transition-colors">
+                  {therian.name ?? 'Sin nombre'}
+                </p>
+                <span className="opacity-0 group-hover:opacity-60 text-purple-400 text-xs transition-opacity">✎</span>
+              </button>
             )}
             <h2 className="text-2xl font-bold text-white">
               {therian.species.emoji} {therian.species.name}
@@ -104,12 +203,44 @@ export default function TherianCard({ therian: initialTherian }: Props) {
 
         {/* Battle nav links */}
         <div className="flex gap-2">
-          <Link
-            href="/bite"
-            className="flex-1 text-center py-2 rounded-lg border border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/10 text-sm font-semibold transition-colors"
-          >
-            ⚔️ Morder
-          </Link>
+          {therian.canBite ? (
+            <Link
+              href="/bite"
+              className="flex-1 text-center py-2 rounded-lg border border-red-500/30 bg-red-500/8 text-red-300 hover:bg-red-500/15 hover:border-red-500/50 text-sm font-semibold transition-colors"
+            >
+              ⚔️ Morder
+            </Link>
+          ) : (
+            <div className="group flex-1 rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center cursor-default">
+              <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">⚔️ Morder</p>
+              <p className="text-white/50 text-xs leading-none group-hover:hidden">
+                {therian.nextBiteAt
+                  ? new Date(therian.nextBiteAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                  : 'mañana'}
+              </p>
+              <p className="text-white/70 text-xs leading-none hidden group-hover:block">
+                {therian.nextBiteAt ? `Faltan ${timeRemaining(therian.nextBiteAt)}` : 'mañana'}
+              </p>
+            </div>
+          )}
+          {therian.canAct ? (
+            <div className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-center">
+              <p className="text-emerald-400 text-xs font-semibold leading-none mb-0.5">🌿 Acción</p>
+              <p className="text-emerald-400/70 text-xs leading-none">Disponible</p>
+            </div>
+          ) : (
+            <div className="group flex-1 rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center cursor-default">
+              <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">🌿 Acción</p>
+              <p className="text-white/50 text-xs leading-none group-hover:hidden">
+                {therian.nextActionAt
+                  ? new Date(therian.nextActionAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                  : 'mañana'}
+              </p>
+              <p className="text-white/70 text-xs leading-none hidden group-hover:block">
+                {therian.nextActionAt ? `Faltan ${timeRemaining(therian.nextActionAt)}` : 'mañana'}
+              </p>
+            </div>
+          )}
           <Link
             href="/leaderboard"
             className="flex-1 text-center py-2 rounded-lg border border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10 text-sm font-semibold transition-colors"
@@ -168,17 +299,6 @@ export default function TherianCard({ therian: initialTherian }: Props) {
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-white/5"/>
-
-        {/* Acciones */}
-        <div className="space-y-3">
-          <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest">Acción del día</h3>
-          <DailyActionButtons
-            therian={therian}
-            onAction={handleAction}
-          />
-        </div>
 
         {/* Narrativa */}
         {narrative && (
