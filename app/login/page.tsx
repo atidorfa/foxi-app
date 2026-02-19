@@ -1,22 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
+  const params = useSearchParams()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (params.get('verified') === '1') {
+      setSuccess('✓ Email verificado. Ya podés iniciar sesión.')
+    }
+  }, [params])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccess(null)
 
     const result = await signIn('credentials', {
       email,
@@ -25,7 +34,9 @@ export default function LoginPage() {
     })
 
     setLoading(false)
-    if (result?.error) {
+    if (result?.error === 'EMAIL_NOT_VERIFIED') {
+      setError('Verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.')
+    } else if (result?.error) {
       setError('Credenciales incorrectas. Verificá tu email y contraseña.')
     } else {
       router.push('/')
@@ -37,6 +48,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const res = await fetch('/api/auth/register', {
@@ -46,27 +58,23 @@ export default function LoginPage() {
       })
 
       const data = await res.json()
+      setLoading(false)
 
       if (!res.ok) {
         if (data.error === 'EMAIL_TAKEN') {
           setError('Ese email ya está en uso.')
+        } else if (data.error === 'INVALID_INPUT') {
+          setError('El email o la contraseña no son válidos.')
         } else {
           setError('Error al crear la cuenta. Verificá los datos.')
         }
-        setLoading(false)
         return
       }
 
-      // Auto-login después del registro
-      const result = await signIn('credentials', { email, password, redirect: false })
-      setLoading(false)
-      if (result?.error) {
-        setError('Cuenta creada. Iniciá sesión manualmente.')
-        setMode('login')
-      } else {
-        router.push('/adopt')
-        router.refresh()
-      }
+      // Show success — no auto-login, must verify first
+      setSuccess('¡Cuenta creada! Te enviamos un email de verificación. Revisá tu bandeja de entrada (y el spam).')
+      setPassword('')
+      setMode('login')
     } catch {
       setLoading(false)
       setError('Error de conexión.')
@@ -79,7 +87,6 @@ export default function LoginPage() {
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-purple-900/10 blur-[120px]"/>
         <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] rounded-full bg-indigo-900/10 blur-[100px]"/>
-        {/* Estrellas */}
         {Array.from({ length: 40 }).map((_, i) => (
           <div
             key={i}
@@ -100,9 +107,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-10">
           <h1 className="text-5xl font-bold tracking-tight gradient-text mb-2">FOXI</h1>
-          <p className="text-[#8B84B0] text-base italic">
-            Tu compañero ya existe.
-          </p>
+          <p className="text-[#8B84B0] text-base italic">Tu compañero ya existe.</p>
         </div>
 
         <div className="rounded-2xl border border-white/8 bg-[#13131F]/90 backdrop-blur-sm p-8 space-y-6">
@@ -111,7 +116,7 @@ export default function LoginPage() {
             {(['login', 'register'] as const).map((tab) => (
               <button
                 key={tab}
-                onClick={() => { setMode(tab); setError(null) }}
+                onClick={() => { setMode(tab); setError(null); setSuccess(null) }}
                 className={`
                   flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200
                   ${mode === tab
@@ -170,6 +175,14 @@ export default function LoginPage() {
               />
             </div>
 
+            {/* Success message */}
+            {success && (
+              <div className="rounded-xl border border-green-500/20 bg-green-500/5 px-4 py-3 text-green-300 text-sm">
+                {success}
+              </div>
+            )}
+
+            {/* Error message */}
             {error && (
               <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-red-300 text-sm">
                 {error}

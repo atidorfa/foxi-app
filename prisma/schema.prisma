@@ -9,12 +9,23 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String
-  name      String?
-  createdAt DateTime  @default(now())
-  therian   Therian?
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  password           String
+  name               String?
+  emailVerified      DateTime?
+  createdAt          DateTime            @default(now())
+  therian            Therian?
+  verificationTokens VerificationToken[]
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Therian {
