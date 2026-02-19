@@ -6,6 +6,8 @@ import { toTherianDTO } from '@/lib/therian-dto'
 import TherianCard from '@/components/TherianCard'
 import SignOutButton from '@/components/SignOutButton'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TherianPage() {
   const session = await getSession()
 
@@ -23,6 +25,16 @@ export default async function TherianPage() {
 
   const dto = toTherianDTO(therian)
 
+  const aboveCount = await db.therian.count({
+    where: {
+      OR: [
+        { bites: { gt: therian.bites } },
+        { bites: therian.bites, level: { gt: therian.level } },
+      ],
+    },
+  })
+  const userRank = aboveCount + 1
+
   return (
     <div className="min-h-screen bg-[#08080F] relative">
       {/* Fondo */}
@@ -37,7 +49,6 @@ export default async function TherianPage() {
       <nav className="relative z-10 border-b border-white/5 bg-[#08080F]/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between">
         <span className="text-xl font-bold gradient-text">FOXI</span>
         <div className="flex items-center gap-4">
-          <Link href="/bite" className="text-[#8B84B0] hover:text-white text-sm transition-colors">⚔️ Morder</Link>
           <Link href="/leaderboard" className="text-[#8B84B0] hover:text-white text-sm transition-colors">🏆 Top</Link>
           <SignOutButton/>
         </div>
@@ -45,12 +56,7 @@ export default async function TherianPage() {
 
       {/* Content */}
       <main className="relative z-10 max-w-md mx-auto px-4 py-8">
-        <TherianCard therian={dto}/>
-
-        {/* Footer lore */}
-        <p className="text-center text-[#4A4468] text-xs mt-6 italic">
-          Adoptado el {new Date(dto.createdAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+        <TherianCard therian={dto} rank={userRank}/>
       </main>
     </div>
   )

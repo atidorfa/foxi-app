@@ -215,9 +215,7 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
             <div className="text-2xl font-black">
               {isUserWinner ? '⚔️ ¡GANASTE!' : '💀 PERDISTE'}
             </div>
-            <div className="text-sm text-[#8B84B0]">
-              {winner.name} venció a {loser.name}
-            </div>
+            
             {isUserWinner && (
               <div className="inline-flex items-center gap-1 bg-amber-500/20 rounded-full px-3 py-1 text-amber-300 text-sm font-bold mt-1">
                 🦷 +1 mordida

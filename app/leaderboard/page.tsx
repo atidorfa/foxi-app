@@ -71,7 +71,6 @@ export default async function LeaderboardPage() {
         <Link href="/therian" className="text-xl font-bold gradient-text">FOXI</Link>
         <div className="flex items-center gap-4">
           <Link href="/therian" className="text-[#8B84B0] hover:text-white text-sm transition-colors">Mi Therian</Link>
-          <Link href="/bite" className="text-[#8B84B0] hover:text-white text-sm transition-colors">⚔️ Morder</Link>
         </div>
       </nav>
 
@@ -81,18 +80,15 @@ export default async function LeaderboardPage() {
           <p className="text-[#8B84B0] text-sm">Los Therians más temidos del mundo.</p>
         </div>
 
-        <LeaderboardTable entries={entries} userRank={userRank} />
-
-        {session?.user?.id && (
-          <div className="text-center">
-            <Link
-              href="/bite"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-red-700 hover:bg-red-600 text-white transition-colors"
-            >
-              ⚔️ Ir a morder
-            </Link>
+        {userRank !== null && (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-3 flex items-center justify-between">
+            <p className="text-[#8B84B0] text-sm">Tu posición global</p>
+            <p className="text-amber-400 font-black font-mono text-2xl">#{userRank}</p>
           </div>
         )}
+
+        <LeaderboardTable entries={entries} userRank={null} />
+
       </main>
     </div>
   )
