@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import type { TherianDTO } from '@/lib/therian-dto'
 import type { BattleResult, BattleRound } from '@/lib/battle/engine'
 import TherianAvatar from './TherianAvatar'
@@ -163,15 +163,38 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
   const [shakeLeft, setShakeLeft] = useState(false)
   const [shakeRight, setShakeRight] = useState(false)
   const floatId = useRef(0)
+  const skippedRef = useRef(false)
+  const [skipping, setSkipping] = useState(false)
+
+  const handleSkip = useCallback(() => {
+    skippedRef.current = true
+    setLungeLeft(false)
+    setLungeRight(false)
+    setShakeLeft(false)
+    setShakeRight(false)
+    setFloatingTexts([])
+    setDisplayedChallengerHp(result.challengerFinalHp)
+    setDisplayedTargetHp(result.targetFinalHp)
+    setCurrentRound(result.rounds.length - 1)
+    setSkipping(true)
+    setTimeout(() => {
+      setSkipping(false)
+      setPhase('result')
+      onComplete?.()
+    }, 550)
+  }, [result, onComplete])
 
   // Intro → fighting
   useEffect(() => {
-    const t = setTimeout(() => setPhase('fighting'), 900)
+    const t = setTimeout(() => {
+      if (!skippedRef.current) setPhase('fighting')
+    }, 900)
     return () => clearTimeout(t)
   }, [])
 
   // Process rounds
   useEffect(() => {
+    if (skippedRef.current) return
     if (phase !== 'fighting') return
     if (currentRound >= result.rounds.length - 1) {
       const t = setTimeout(() => {
@@ -246,6 +269,17 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
           style={{ background: target.appearance.paletteColors.primary }} />
       </div>
 
+      {/* Skip color wash overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none rounded-2xl transition-opacity duration-500"
+        style={{
+          background: isUserWinner
+            ? 'radial-gradient(ellipse at center, rgba(34,197,94,0.25) 0%, transparent 70%)'
+            : 'radial-gradient(ellipse at center, rgba(239,68,68,0.25) 0%, transparent 70%)',
+          opacity: skipping ? 1 : 0,
+        }}
+      />
+
       <div className="relative px-4 pt-4 pb-6 space-y-4">
         {/* Round counter */}
         <div className="text-center">
@@ -257,7 +291,7 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
         </div>
 
         {/* Combatants row */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className={`grid grid-cols-[1fr_auto_1fr] items-center gap-2 transition-opacity duration-500 ${skipping ? 'opacity-0' : 'opacity-100'}`}>
           {/* Challenger side */}
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
@@ -311,8 +345,20 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
           </div>
         </div>
 
+        {/* Skip button */}
+        {phase !== 'result' && !skipping && (
+          <div className="flex justify-center">
+            <button
+              onClick={handleSkip}
+              className="px-4 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all text-xs font-medium tracking-wide"
+            >
+              Saltar animación ⏭
+            </button>
+          </div>
+        )}
+
         {/* Round log — last 3 rounds */}
-        <div className="space-y-1 min-h-[60px]">
+        <div className={`space-y-1 min-h-[60px] transition-opacity duration-300 ${skipping ? 'opacity-0' : 'opacity-100'}`}>
           {result.rounds
             .slice(Math.max(0, currentRound - 2), currentRound + 1)
             .map((r, i) => {
@@ -332,10 +378,10 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
         {/* Result banner */}
         {phase === 'result' && (
           <>
-            <div className={`rounded-xl border px-4 py-4 text-center space-y-1 ${
+            <div className={`rounded-xl border px-4 py-4 text-center space-y-1 animate-[resultAppear_0.45s_cubic-bezier(0.34,1.56,0.64,1)_forwards] ${
               isUserWinner
-                ? 'border-amber-500/40 bg-amber-500/10'
-                : 'border-red-500/30 bg-red-500/5'
+                ? 'border-green-500/50 bg-green-500/10'
+                : 'border-red-500/40 bg-red-500/10'
             }`}>
               <div className="text-2xl font-black">
                 {isUserWinner ? '⚔️ ¡GANASTE!' : '💀 PERDISTE'}
@@ -365,6 +411,10 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
           0%,100% { transform: translateX(0); }
           25%      { transform: translateX(-5px); }
           75%      { transform: translateX(5px); }
+        }
+        @keyframes resultAppear {
+          0%   { opacity: 0; transform: scale(0.88) translateY(10px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
         }
       `}</style>
     </div>
