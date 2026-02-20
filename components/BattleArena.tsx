@@ -40,6 +40,115 @@ interface FloatingText {
   side: 'left' | 'right'
 }
 
+function CombatLog({
+  rounds,
+  challengerName,
+  targetName,
+}: {
+  rounds: BattleRound[]
+  challengerName: string
+  targetName: string
+}) {
+  const [open, setOpen] = useState(false)
+
+  // Summary stats
+  const hits     = rounds.filter(r => !r.evaded && !r.blocked && r.damage > 0).length
+  const evades   = rounds.filter(r => r.evaded).length
+  const blocks   = rounds.filter(r => r.blocked).length
+  const crits    = rounds.filter(r => r.critical).length
+  const counters = rounds.filter(r => r.blocked && r.counterDamage > 0).length
+
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/3 overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm text-[#8B84B0] hover:text-white transition-colors"
+      >
+        <span className="font-semibold tracking-wide">📋 Log del combate ({rounds.length} turnos)</span>
+        <span className="text-xs opacity-60">{open ? '▲ cerrar' : '▼ expandir'}</span>
+      </button>
+
+      {/* Summary pills — always visible */}
+      <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-300 font-mono">
+          {hits} golpes
+        </span>
+        {crits > 0 && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono">
+            {crits} críticos
+          </span>
+        )}
+        {evades > 0 && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 font-mono">
+            {evades} esquives
+          </span>
+        )}
+        {blocks > 0 && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-mono">
+            {blocks} bloqueos{counters > 0 ? ` (${counters} contras)` : ''}
+          </span>
+        )}
+      </div>
+
+      {/* Expanded per-round table */}
+      {open && (
+        <div className="border-t border-white/5 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-[#4A4468] uppercase tracking-widest border-b border-white/5">
+                <th className="text-left px-3 py-2 font-medium w-8">#</th>
+                <th className="text-left px-3 py-2 font-medium">Atacante</th>
+                <th className="text-left px-3 py-2 font-medium">Resultado</th>
+                <th className="text-right px-3 py-2 font-medium">Daño</th>
+                <th className="text-right px-3 py-2 font-medium">Contra</th>
+                <th className="text-right px-3 py-2 font-medium">HP A</th>
+                <th className="text-right px-3 py-2 font-medium">HP B</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rounds.map((r, i) => {
+                const atkName = r.attacker === 'challenger' ? challengerName : targetName
+                const isChallenger = r.attacker === 'challenger'
+
+                let resultLabel = ''
+                let resultColor = 'text-white/60'
+                if (r.evaded)        { resultLabel = 'ESQUIVÓ';   resultColor = 'text-blue-400' }
+                else if (r.blocked)  { resultLabel = 'BLOQUEÓ';   resultColor = 'text-emerald-400' }
+                else if (r.critical) { resultLabel = '⚡ CRÍTICO'; resultColor = 'text-amber-400' }
+                else                 { resultLabel = 'Golpe';     resultColor = 'text-white/50' }
+
+                return (
+                  <tr
+                    key={i}
+                    className={`border-b border-white/3 ${i % 2 === 0 ? 'bg-white/2' : ''}`}
+                  >
+                    <td className="px-3 py-1.5 text-[#4A4468] font-mono">{i + 1}</td>
+                    <td className={`px-3 py-1.5 font-semibold ${isChallenger ? 'text-purple-300' : 'text-red-300'}`}>
+                      {atkName}
+                    </td>
+                    <td className={`px-3 py-1.5 ${resultColor}`}>{resultLabel}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-red-300">
+                      {r.damage > 0 ? `-${r.damage}` : '—'}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-emerald-300">
+                      {r.counterDamage > 0 ? `↩ -${r.counterDamage}` : '—'}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-white/40">{r.challengerHp}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-white/40">{r.targetHp}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <div className="px-3 py-2 text-[10px] text-[#4A4468]">
+            HP A = {challengerName} · HP B = {targetName}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function BattleArena({ challenger, target, result, onComplete }: BattleArenaProps) {
   const initChallengerHp = challenger.stats.vitality
   const initTargetHp = target.stats.vitality
@@ -88,23 +197,36 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
       setDisplayedChallengerHp(round.challengerHp)
       setDisplayedTargetHp(round.targetHp)
 
-      // Shake defender if damage was dealt
+      // Shake defender if damage was dealt, attacker if blocked+counter
       if (round.damage > 0) {
         if (isLeft) setShakeRight(true)
         else setShakeLeft(true)
         setTimeout(() => { setShakeLeft(false); setShakeRight(false) }, 300)
+      } else if (round.blocked && round.counterDamage > 0) {
+        if (isLeft) setShakeLeft(true)
+        else setShakeRight(true)
+        setTimeout(() => { setShakeLeft(false); setShakeRight(false) }, 300)
       }
 
-      // Floating text
+      // Floating text on defender side
       const id = ++floatId.current
       let text = `-${round.damage}`
       let color = '#fc8181'
-      if (round.evaded) { text = 'ESQUIVÓ'; color = '#63b3ed' }
+      if (round.evaded)        { text = 'ESQUIVÓ';               color = '#63b3ed' }
+      else if (round.blocked)  { text = '🛡️ BLOQUEÓ!';          color = '#68d391' }
       else if (round.critical) { text = `CRÍTICO! -${round.damage}`; color = '#f6e05e' }
 
-      const side: 'left' | 'right' = isLeft ? 'right' : 'left'
-      setFloatingTexts(prev => [...prev, { id, text, color, side }])
+      const defSide: 'left' | 'right' = isLeft ? 'right' : 'left'
+      setFloatingTexts(prev => [...prev, { id, text, color, side: defSide }])
       setTimeout(() => setFloatingTexts(prev => prev.filter(f => f.id !== id)), 1000)
+
+      // Counter damage floating text on attacker side
+      if (round.blocked && round.counterDamage > 0) {
+        const cid = ++floatId.current
+        const atkSide: 'left' | 'right' = isLeft ? 'left' : 'right'
+        setFloatingTexts(prev => [...prev, { id: cid, text: `↩ -${round.counterDamage}`, color: '#68d391', side: atkSide }])
+        setTimeout(() => setFloatingTexts(prev => prev.filter(f => f.id !== cid)), 1000)
+      }
     }, ROUND_DELAY_MS)
 
     return () => clearTimeout(t)
@@ -195,8 +317,10 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
             .slice(Math.max(0, currentRound - 2), currentRound + 1)
             .map((r, i) => {
               const atkName = r.attacker === 'challenger' ? (challenger.name ?? 'Tú') : (target.name ?? 'Rival')
+              const defName = r.attacker === 'challenger' ? (target.name ?? 'Rival') : (challenger.name ?? 'Tú')
               let msg = `${atkName} ataca`
-              if (r.evaded) msg += ' — ¡ESQUIVÓ!'
+              if (r.evaded)       msg += ` — ¡${defName} esquivó!`
+              else if (r.blocked) msg += ` — ¡${defName} bloqueó! ↩ -${r.counterDamage}`
               else if (r.critical) msg += ` — ¡CRÍTICO! (-${r.damage})`
               else msg += ` (-${r.damage})`
               return (
@@ -207,21 +331,28 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
 
         {/* Result banner */}
         {phase === 'result' && (
-          <div className={`rounded-xl border px-4 py-4 text-center space-y-1 ${
-            isUserWinner
-              ? 'border-amber-500/40 bg-amber-500/10'
-              : 'border-red-500/30 bg-red-500/5'
-          }`}>
-            <div className="text-2xl font-black">
-              {isUserWinner ? '⚔️ ¡GANASTE!' : '💀 PERDISTE'}
-            </div>
-            
-            {isUserWinner && (
-              <div className="inline-flex items-center gap-1 bg-amber-500/20 rounded-full px-3 py-1 text-amber-300 text-sm font-bold mt-1">
-                🦷 +1 mordida
+          <>
+            <div className={`rounded-xl border px-4 py-4 text-center space-y-1 ${
+              isUserWinner
+                ? 'border-amber-500/40 bg-amber-500/10'
+                : 'border-red-500/30 bg-red-500/5'
+            }`}>
+              <div className="text-2xl font-black">
+                {isUserWinner ? '⚔️ ¡GANASTE!' : '💀 PERDISTE'}
               </div>
-            )}
-          </div>
+              {isUserWinner && (
+                <div className="inline-flex items-center gap-1 bg-amber-500/20 rounded-full px-3 py-1 text-amber-300 text-sm font-bold mt-1">
+                  🦷 +1 mordida
+                </div>
+              )}
+            </div>
+
+            <CombatLog
+              rounds={result.rounds}
+              challengerName={challenger.name ?? 'Tú'}
+              targetName={target.name ?? 'Rival'}
+            />
+          </>
         )}
       </div>
 
