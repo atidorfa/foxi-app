@@ -68,7 +68,7 @@ export default async function LeaderboardPage() {
 
       {/* Navbar */}
       <nav className="relative z-10 border-b border-white/5 bg-[#08080F]/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between">
-        <Link href="/therian" className="text-xl font-bold gradient-text">FOXI</Link>
+        <Link href="/therian" className="text-xl font-bold gradient-text">therian.biz</Link>
         <div className="flex items-center gap-4">
           <Link href="/therian" className="text-[#8B84B0] hover:text-white text-sm transition-colors">Mi Therian</Link>
         </div>

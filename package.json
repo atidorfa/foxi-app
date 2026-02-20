@@ -1,5 +1,5 @@
 {
-  "name": "foxi-app",
+  "name": "therian-biz",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,18 +8,25 @@
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
-    "generate": "prisma generate"
+    "generate": "prisma generate",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "prisma migrate deploy",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@types/nodemailer": "^7.0.10",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.34.1",
     "next": "16.1.6",
     "next-auth": "^4.24.13",
+    "nodemailer": "^7.0.13",
     "prisma": "^5.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "resend": "^6.9.2",
     "seedrandom": "^3.0.5",
     "uuid": "^13.0.0",
     "zod": "^4.3.6"

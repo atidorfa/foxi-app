@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Foxi — Tu Compañero Therian',
+  title: 'therian.biz — Tu Compañero Therian',
   description: 'Adoptá tu Therian. Cuidalo. Hacelo crecer.',
   icons: { icon: '/favicon.ico' },
 }

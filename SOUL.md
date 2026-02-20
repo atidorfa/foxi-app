@@ -3,7 +3,7 @@
 ## 1) La promesa central
 **"Cada persona tiene un Therian. El tuyo ya existe. Solo necesita ser encontrado."**
 
-Foxi es una app donde iniciar sesión es el primer acto de un descubrimiento: el sistema genera —de forma irrepetible— un compañero con forma, color, personalidad y stats únicos. Ese compañero evoluciona contigo, a tu ritmo, un gesto por día.
+Foxi (therian.biz) es una app donde iniciar sesión es el primer acto de un descubrimiento: el sistema genera —de forma irrepetible— un compañero con forma, color, personalidad y stats únicos. Ese compañero evoluciona contigo, a tu ritmo, un gesto por día.
 
 ---
 
@@ -110,7 +110,7 @@ Cada acción dura exactamente **un gesto del usuario** y produce:
 ## 8) Diseño de pantallas
 
 ### /login — El umbral
-- Pantalla oscura, logo minimalista "FOXI"
+- Pantalla oscura, logo minimalista "FOXI (therian.biz)"
 - Tagline: *"Tu compañero ya existe."*
 - Form simple: email + contraseña
 - Link a registro
@@ -186,7 +186,7 @@ Cada acción dura exactamente **un gesto del usuario** y produce:
 
 ---
 
-## 11) Lo que Foxi NO es (guía de ética)
+## 11) Lo que Foxi (therian.biz) NO es (guía de ética)
 
 - **No** es una herramienta de diagnóstico o análisis psicológico
 - **No** afirma ninguna identidad real del usuario

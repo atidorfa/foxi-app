@@ -1,7 +1,7 @@
 # CLAUDE.md — Especificación técnica completa (MVP)
 
 ## 0) Objetivo del producto
-**Foxi** es una web app donde el usuario:
+**Foxi (therian.biz)** es una web app donde el usuario:
 1. Inicia sesión (email/contraseña local para MVP).
 2. Si no tiene Therian, **adopta/genera** uno único proceduralmente.
 3. El Therian tiene **apariencia SVG por capas + stats aleatorios** regidos por rareza.
@@ -40,7 +40,7 @@
 ## 2) Estructura de carpetas
 
 ```
-foxi/
+foxi/ (therian.biz)
 ├── app/
 │   ├── (auth)/
 │   │   └── login/
