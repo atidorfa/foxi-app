@@ -1,16 +1,23 @@
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 
-// Lazy init — avoids crash at build time when RESEND_API_KEY is not set
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY)
+function createTransport() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: false, // TLS via STARTTLS
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  })
 }
 
 export async function sendVerificationEmail(to: string, token: string): Promise<void> {
   const baseUrl = process.env.APP_BASE_URL ?? 'http://localhost:3000'
   const verifyUrl = `${baseUrl}/verify?token=${token}`
 
-  // Dev fallback: if no API key configured, just log the URL
-  if (!process.env.RESEND_API_KEY) {
+  // Dev fallback: if SMTP not configured, log the URL to console
+  if (!process.env.SMTP_HOST) {
     console.log('\n[DEV] ─────────────────────────────────────────')
     console.log('[DEV] Verification email would be sent to:', to)
     console.log('[DEV] Click to verify:', verifyUrl)
@@ -18,9 +25,9 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
     return
   }
 
-  const from = process.env.EMAIL_FROM ?? 'FOXI <noreply@resend.dev>'
+  const from = process.env.EMAIL_FROM ?? process.env.SMTP_USER
 
-  await getResend().emails.send({
+  await createTransport().sendMail({
     from,
     to,
     subject: 'Verificá tu email — FOXI',
