@@ -11,8 +11,9 @@
     "generate": "prisma generate",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:migrate": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:migrate": "dotenv -e .env -- prisma migrate deploy",
+    "db:studio": "dotenv -e .env -- prisma studio",
+    "db:migrate:prod": "dotenv -e .env.migrate -- prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -39,6 +40,7 @@
     "@types/react-dom": "^19",
     "@types/seedrandom": "^3.0.8",
     "@types/uuid": "^11.0.0",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
