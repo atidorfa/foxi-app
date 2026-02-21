@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { toTherianDTO } from '@/lib/therian-dto'
-import RuneSystem from '@/components/RuneSystem'
 import TherianTabs from '@/components/TherianTabs'
 import SignOutButton from '@/components/SignOutButton'
 import CurrencyDisplay from '@/components/CurrencyDisplay'
@@ -75,7 +74,6 @@ export default async function TherianPage() {
 
       {/* Content */}
       <main className="relative z-10 max-w-md mx-auto px-4 py-8">
-        <RuneSystem therian={dto} rank={userRank}/>
         <TherianTabs
           therians={dtos}
           ranks={ranks}

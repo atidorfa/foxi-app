@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { slotIndex, runeId } = body
+    const { slotIndex, runeId, therianId } = body
 
     if (typeof slotIndex !== 'number' || slotIndex < 0 || slotIndex >= 6) {
       return NextResponse.json({ error: 'INVALID_SLOT' }, { status: 400 })
@@ -22,9 +22,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_RUNE' }, { status: 400 })
     }
 
-    const therian = await db.therian.findUnique({
-      where: { userId: session.user.id },
-    })
+    const therian = therianId
+      ? await db.therian.findFirst({ where: { id: therianId, userId: session.user.id } })
+      : await db.therian.findFirst({ where: { userId: session.user.id }, orderBy: { createdAt: 'asc' } })
 
     if (!therian) {
       return NextResponse.json({ error: 'NO_THERIAN' }, { status: 404 })

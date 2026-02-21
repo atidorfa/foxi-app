@@ -262,7 +262,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
       const res = await fetch('/api/therian/runes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slotIndex: selectedSlot, runeId }),
+        body: JSON.stringify({ slotIndex: selectedSlot, runeId, therianId: therian.id }),
       })
       if (res.ok) {
         const updated = await res.json()
