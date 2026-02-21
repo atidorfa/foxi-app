@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_RUNE' }, { status: 400 })
     }
 
-    const therian = await db.therian.findUnique({
+    const therian = await db.therian.findFirst({
       where: { userId: session.user.id },
     })
 
