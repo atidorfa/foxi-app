@@ -52,6 +52,17 @@ model Therian {
 
   battlesAsChallenger BattleLog[] @relation("Challenger")
   battlesAsTarget     BattleLog[] @relation("Target")
+  runeInventory       RuneInventory[]
+}
+
+model RuneInventory {
+  id         String   @id @default(uuid())
+  therianId  String
+  therian    Therian  @relation(fields: [therianId], references: [id], onDelete: Cascade)
+  runeId     String
+  obtainedAt DateTime @default(now())
+
+  @@index([therianId])
 }
 
 model BattleLog {

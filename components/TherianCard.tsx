@@ -10,6 +10,7 @@ import RarityBadge from './RarityBadge'
 import DailyActionButtons from './DailyActionButtons'
 import FlavorText from './FlavorText'
 import BattleArena from './BattleArena'
+import { RUNES, type Rune } from '@/lib/catalogs/runes'
 
 interface Props {
   therian: TherianDTO
@@ -52,6 +53,8 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [showActionPopup, setShowActionPopup] = useState(false)
   const [showStats, setShowStats] = useState(false)
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
+  const [equipping, setEquipping] = useState(false)
 
   // Bite popup
   const [showBitePopup, setShowBitePopup] = useState(false)
@@ -223,6 +226,32 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
     }
   }
 
+  const handleEquip = async (runeId: string | null) => {
+    if (selectedSlot === null) return
+    setEquipping(true)
+    try {
+      const res = await fetch('/api/therian/runes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotIndex: selectedSlot, runeId }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setTherian(updated)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setEquipping(false)
+      setSelectedSlot(null)
+    }
+  }
+
+  const equippedRunesArray: (Rune | null)[] = Array.from({ length: 6 }, (_, i) => {
+    const id = therian.equippedRunesIds?.[i]
+    return id ? (RUNES.find(r => r.id === id) ?? null) : null
+  })
+
   const xpPct = Math.min(100, (therian.xp / therian.xpToNext) * 100)
   const glowClass = RARITY_GLOW[therian.rarity] ?? RARITY_GLOW.COMMON
 
@@ -234,33 +263,32 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
           showStats ? 'translate-x-[95%]' : 'translate-x-[12px]'
         }`}
       >
-        <div className={`w-full p-6 pl-10 flex flex-col justify-center space-y-6 transition-opacity duration-300 ${showStats ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'}`}>
-          <div className="space-y-4">
-            <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold flex items-center justify-between">
-              Stats
-            </h3>
-            {STAT_CONFIG.map((cfg) => (
-              <StatBar
-                key={cfg.key}
-                label={cfg.label}
-                icon={cfg.icon}
-                value={therian.stats[cfg.key]}
-                color={cfg.color}
-                delta={lastDelta?.stat === cfg.key ? lastDelta.amount : undefined}
-              />
+        <div className={`w-full p-5 pl-10 flex flex-col justify-center space-y-4 transition-opacity duration-300 ${showStats ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'}`}>
+          <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold">
+            Runas
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {equippedRunesArray.map((rune, i) => (
+              <button
+                key={i}
+                onClick={() => setSelectedSlot(i)}
+                className="group border border-white/10 bg-white/3 rounded-xl p-2 text-left hover:border-purple-500/40 hover:bg-purple-950/20 transition-all min-h-[60px] flex flex-col justify-center cursor-pointer"
+              >
+                {rune ? (
+                  <>
+                    <div className="text-purple-300 text-[10px] font-bold leading-tight mb-1 line-clamp-1">{rune.name}</div>
+                    <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+                      {rune.mod.vitality !== undefined && <span className="text-[9px] text-emerald-400 font-mono">{rune.mod.vitality > 0 ? '+' : ''}{rune.mod.vitality}🌿</span>}
+                      {rune.mod.agility !== undefined && <span className="text-[9px] text-yellow-400 font-mono">{rune.mod.agility > 0 ? '+' : ''}{rune.mod.agility}⚡</span>}
+                      {rune.mod.instinct !== undefined && <span className="text-[9px] text-blue-400 font-mono">{rune.mod.instinct > 0 ? '+' : ''}{rune.mod.instinct}🌌</span>}
+                      {rune.mod.charisma !== undefined && <span className="text-[9px] text-amber-400 font-mono">{rune.mod.charisma > 0 ? '+' : ''}{rune.mod.charisma}✨</span>}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-white/15 text-lg text-center w-full group-hover:text-purple-400/50 transition-colors">+</div>
+                )}
+              </button>
             ))}
-          </div>
-          <div className="space-y-1 pt-4 border-t border-white/5">
-            <div className="flex justify-between text-xs text-[#8B84B0] mb-2">
-              <span>XP</span>
-              <span className="font-mono">{therian.xp} / {therian.xpToNext}</span>
-            </div>
-            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full transition-all duration-1000"
-                style={{ width: `${xpPct}%` }}
-              />
-            </div>
           </div>
         </div>
 
@@ -422,6 +450,32 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                 <span className="text-4xl animate-bounce">⬆️</span>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="space-y-3">
+          {STAT_CONFIG.map((cfg) => (
+            <StatBar
+              key={cfg.key}
+              label={cfg.label}
+              icon={cfg.icon}
+              value={therian.stats[cfg.key]}
+              color={cfg.color}
+              delta={lastDelta?.stat === cfg.key ? lastDelta.amount : undefined}
+            />
+          ))}
+          <div className="pt-2 space-y-1">
+            <div className="flex justify-between text-xs text-[#8B84B0]">
+              <span>XP</span>
+              <span className="font-mono">{therian.xp} / {therian.xpToNext}</span>
+            </div>
+            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full transition-all duration-1000"
+                style={{ width: `${xpPct}%` }}
+              />
+            </div>
           </div>
         </div>
 
@@ -599,6 +653,63 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                 </Link>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Rune selector modal */}
+      {selectedSlot !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => !equipping && setSelectedSlot(null)}
+        >
+          <div
+            className="bg-[#13131F] border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-white/10 flex items-center justify-center relative">
+              <h3 className="text-white font-semibold uppercase tracking-widest text-sm">Equipar Runa ✧</h3>
+              <button
+                onClick={() => !equipping && setSelectedSlot(null)}
+                className="absolute right-4 text-white/40 hover:text-white transition-colors"
+              >✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 grid gap-3 grid-cols-1 md:grid-cols-2">
+              <button
+                disabled={equipping}
+                onClick={() => handleEquip(null)}
+                className="col-span-1 md:col-span-2 p-3 rounded-xl border border-white/10 text-[#8B84B0] hover:text-white hover:border-white/30 text-sm text-center disabled:opacity-50 transition-colors"
+              >
+                Quitar Runa Actual
+              </button>
+              {RUNES.map(rune => {
+                const isEquipped = equippedRunesArray.some(r => r?.id === rune.id)
+                return (
+                  <button
+                    key={rune.id}
+                    onClick={() => !isEquipped && handleEquip(rune.id)}
+                    disabled={equipping || isEquipped}
+                    className={`flex flex-col text-left p-3 rounded-xl border transition-all ${
+                      isEquipped
+                        ? 'border-white/5 bg-white/5 opacity-50 cursor-not-allowed'
+                        : 'border-white/10 bg-white/5 hover:border-purple-500 hover:bg-white/10 active:scale-[0.98]'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-1 w-full gap-2">
+                      <span className="text-purple-300 font-bold text-sm leading-tight">{rune.name}</span>
+                      {isEquipped && <span className="text-[9px] text-white/30 uppercase bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">Equipada</span>}
+                    </div>
+                    <p className="text-[#8B84B0] text-xs italic mb-2 flex-1">{rune.lore}</p>
+                    <div className="font-mono text-[11px] flex flex-wrap gap-2 pt-2 border-t border-white/5">
+                      {rune.mod.vitality !== undefined && <span className="text-emerald-400">🌿 {rune.mod.vitality > 0 ? '+' : ''}{rune.mod.vitality}</span>}
+                      {rune.mod.agility !== undefined && <span className="text-yellow-400">⚡ {rune.mod.agility > 0 ? '+' : ''}{rune.mod.agility}</span>}
+                      {rune.mod.instinct !== undefined && <span className="text-blue-400">🌌 {rune.mod.instinct > 0 ? '+' : ''}{rune.mod.instinct}</span>}
+                      {rune.mod.charisma !== undefined && <span className="text-amber-400">✨ {rune.mod.charisma > 0 ? '+' : ''}{rune.mod.charisma}</span>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
