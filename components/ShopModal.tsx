@@ -6,8 +6,8 @@ import type { TherianDTO } from '@/lib/therian-dto'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
 
 interface Wallet {
-  essencia: number
-  therianCoin: number
+  gold: number
+  essence: number
 }
 
 interface Props {
@@ -17,21 +17,21 @@ interface Props {
   onPurchase: (newWallet: Wallet, updatedTherian?: TherianDTO) => void
 }
 
-type Tab = 'essencia' | 'coin'
+type Tab = 'gold' | 'coin'
 
 const EXCHANGE_RATE = 200
 
 export default function ShopModal({ therian, wallet, onClose, onPurchase }: Props) {
-  const [tab, setTab] = useState<Tab>('essencia')
+  const [tab, setTab] = useState<Tab>('gold')
   const [renameInput, setRenameInput] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [exchanging, setExchanging] = useState(false)
 
-  const essenciaItems = SHOP_ITEMS.filter(i => i.costEssencia > 0)
+  const goldItems = SHOP_ITEMS.filter(i => i.costGold > 0)
   const coinItems = SHOP_ITEMS.filter(i => i.costCoin > 0)
-  const displayItems = tab === 'essencia' ? essenciaItems : coinItems
+  const displayItems = tab === 'gold' ? goldItems : coinItems
 
   async function handleBuy(itemId: string) {
     setError(null)
@@ -92,7 +92,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
           : 'Error al cambiar.')
         return
       }
-      onPurchase({ essencia: data.essencia, therianCoin: data.therianCoin })
+      onPurchase({ gold: data.gold, essence: data.essence })
     } catch {
       setError('Error de conexión.')
     } finally {
@@ -125,19 +125,19 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
           <div className="flex items-center gap-3 text-xs font-mono mb-3">
             <span className="flex items-center gap-1 text-amber-400">
               <span>🪙</span>
-              <span className="font-semibold">{wallet.essencia.toLocaleString('es-AR')} GOLD</span>
+              <span className="font-semibold">{wallet.gold.toLocaleString('es-AR')} GOLD</span>
             </span>
             <span className="text-white/20">|</span>
             <span className="flex items-center gap-1 text-blue-400">
               <span>🪙</span>
-              <span className="font-semibold">{wallet.therianCoin.toLocaleString('es-AR')} ESENCIA</span>
+              <span className="font-semibold">{wallet.essence.toLocaleString('es-AR')} ESENCIA</span>
             </span>
           </div>
 
           {/* Exchange */}
           <button
             onClick={handleExchange}
-            disabled={exchanging || wallet.essencia < EXCHANGE_RATE}
+            disabled={exchanging || wallet.gold < EXCHANGE_RATE}
             className="w-full flex items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
             {exchanging ? '⏳ Canjeando...' : `🪙 ${EXCHANGE_RATE} GOLD → 🪙 1 ESENCIA`}
@@ -145,19 +145,19 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
 
           {/* Tabs */}
           <div className="flex gap-1 mt-3">
-            {(['essencia', 'coin'] as Tab[]).map(t => (
+            {(['gold', 'coin'] as Tab[]).map(t => (
               <button
                 key={t}
                 onClick={() => { setTab(t); setError(null); setRenamingId(null) }}
                 className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
                   tab === t
-                    ? t === 'essencia'
+                    ? t === 'gold'
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                       : 'bg-blue-900/30 text-blue-400 border border-blue-700/40'
                     : 'text-white/30 hover:text-white/60'
                 }`}
               >
-                {t === 'essencia' ? '🪙 GOLD' : '🪙 ESENCIA'}
+                {t === 'gold' ? '🪙 GOLD' : '🪙 ESENCIA'}
               </button>
             ))}
           </div>
@@ -174,13 +174,13 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
               ? therian.accessories?.includes(item.accessoryId)
               : false
             const isLoadingThis = loading === item.id
-            const cost = item.costEssencia > 0 ? item.costEssencia : item.costCoin
-            const costLabel = item.costEssencia > 0
+            const cost = item.costGold > 0 ? item.costGold : item.costCoin
+            const costLabel = item.costGold > 0
               ? `${cost.toLocaleString('es-AR')} 🪙`
               : `${cost} 🪙`
-            const canAfford = item.costEssencia > 0
-              ? wallet.essencia >= item.costEssencia
-              : wallet.therianCoin >= item.costCoin
+            const canAfford = item.costGold > 0
+              ? wallet.gold >= item.costGold
+              : wallet.essence >= item.costCoin
 
             return (
               <div

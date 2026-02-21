@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   await db.user.update({
     where: { id: session.user.id },
-    data: { essencia: { increment: delta.essencia } },
+    data: { gold: { increment: delta.gold } },
   })
 
   // Log de la acción
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     data: {
       therianId:  therian.id,
       actionType,
-      delta:      JSON.stringify({ stat: delta.stat, amount: delta.amount, xp: delta.xp, essencia: delta.essencia }),
+      delta:      JSON.stringify({ stat: delta.stat, amount: delta.amount, xp: delta.xp, gold: delta.gold }),
       narrative,
     },
   })
@@ -102,6 +102,6 @@ export async function POST(req: NextRequest) {
     narrative,
     delta: { stat: delta.stat, amount: delta.amount, xp: delta.xp },
     levelUp: level > therian.level,
-    essenciaEarned: delta.essencia,
+    goldEarned: delta.gold,
   })
 }

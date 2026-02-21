@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 
 interface Wallet {
-  essencia: number
-  therianCoin: number
+  gold: number
+  essence: number
 }
 
 export default function CurrencyDisplay() {
@@ -38,14 +38,14 @@ export default function CurrencyDisplay() {
       <div className="flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-3 py-1.5">
         <span className="text-sm">🪙</span>
         <span className="text-amber-400 font-semibold">
-          {wallet.essencia.toLocaleString('es-AR')}
+          {wallet.gold.toLocaleString('es-AR')}
         </span>
       </div>
       {/* ESENCIA — premium, intercambiable */}
       <div className="flex items-center gap-1.5 rounded-full border border-blue-700/30 bg-blue-900/20 px-3 py-1.5">
         <span className="text-sm">🪙</span>
         <span className="text-blue-400 font-semibold">
-          {wallet.therianCoin.toLocaleString('es-AR')}
+          {wallet.essence.toLocaleString('es-AR')}
         </span>
       </div>
     </div>
