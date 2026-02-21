@@ -25,7 +25,7 @@ const ACTIONS: Array<{
   },
   {
     type: 'TRAIN',
-    label: 'Entrenar',
+    label: 'Templar',
     icon: '⚡',
     desc: '+Agilidad',
     stat: 'agility',

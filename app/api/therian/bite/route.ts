@@ -9,6 +9,7 @@ const COOLDOWN_MS = 24 * 60 * 60 * 1000
 
 const BodySchema = z.object({
   target_name: z.string().min(1),
+  therianId: z.string().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -25,9 +26,9 @@ export async function POST(req: NextRequest) {
   const { target_name } = parsed.data
 
   // Load challenger
-  let challenger = await db.therian.findUnique({
-    where: { userId: session.user.id },
-  })
+  let challenger = parsed.data.therianId
+    ? await db.therian.findFirst({ where: { id: parsed.data.therianId, userId: session.user.id } })
+    : await db.therian.findFirst({ where: { userId: session.user.id }, orderBy: { createdAt: 'asc' } })
   if (!challenger) {
     return NextResponse.json({ error: 'NO_THERIAN' }, { status: 404 })
   }
@@ -68,6 +69,8 @@ export async function POST(req: NextRequest) {
   )
 
   const challengerWon = result.winner === 'challenger'
+  const GOLD_WIN  = 25
+  const GOLD_LOSE = 10
 
   // Persist in a transaction
   const [updatedChallenger, updatedTarget] = await db.$transaction(async (tx) => {
@@ -95,13 +98,22 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Award GOLD to challenger
+    await tx.user.update({
+      where: { id: session.user.id },
+      data: { essencia: { increment: challengerWon ? GOLD_WIN : GOLD_LOSE } },
+    })
+
     return [uc, ut]
   })
+
+  const goldEarned = challengerWon ? GOLD_WIN : GOLD_LOSE
 
   return NextResponse.json({
     battle: result,
     challenger: toTherianDTO(updatedChallenger),
     target: toTherianDTO(updatedTarget),
     biteAwarded: challengerWon,
+    goldEarned,
   })
 }

@@ -1,0 +1,244 @@
+'use client'
+
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { TherianDTO } from '@/lib/therian-dto'
+import { SHOP_ITEMS } from '@/lib/shop/catalog'
+
+interface Wallet {
+  essencia: number
+  therianCoin: number
+}
+
+interface Props {
+  therian: TherianDTO
+  wallet: Wallet
+  onClose: () => void
+  onPurchase: (newWallet: Wallet, updatedTherian?: TherianDTO) => void
+}
+
+type Tab = 'essencia' | 'coin'
+
+const EXCHANGE_RATE = 200
+
+export default function ShopModal({ therian, wallet, onClose, onPurchase }: Props) {
+  const [tab, setTab] = useState<Tab>('essencia')
+  const [renameInput, setRenameInput] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [loading, setLoading] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [exchanging, setExchanging] = useState(false)
+
+  const essenciaItems = SHOP_ITEMS.filter(i => i.costEssencia > 0)
+  const coinItems = SHOP_ITEMS.filter(i => i.costCoin > 0)
+  const displayItems = tab === 'essencia' ? essenciaItems : coinItems
+
+  async function handleBuy(itemId: string) {
+    setError(null)
+
+    if (itemId === 'rename') {
+      if (renamingId !== itemId) {
+        setRenamingId(itemId)
+        return
+      }
+      if (!renameInput.trim()) return
+    }
+
+    setLoading(itemId)
+    try {
+      const res = await fetch('/api/shop/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId,
+          ...(itemId === 'rename' ? { newName: renameInput.trim() } : {}),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        const messages: Record<string, string> = {
+          INSUFFICIENT_ESSENCIA: `GOLD insuficiente (necesitas ${data.required}, tienes ${data.available})`,
+          INSUFFICIENT_COIN: `ESENCIA insuficiente (necesitas ${data.required}, tienes ${data.available})`,
+          NAME_TAKEN: 'Ese nombre ya está en uso.',
+          ALREADY_OWNED: 'Ya tienes este accesorio.',
+          NAME_REQUIRED: 'Ingresa un nombre.',
+        }
+        setError(messages[data.error] ?? 'Error al comprar.')
+        return
+      }
+      setRenamingId(null)
+      setRenameInput('')
+      onPurchase(data.newBalance, data.updatedTherian)
+    } catch {
+      setError('Error de conexión.')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function handleExchange() {
+    setError(null)
+    setExchanging(true)
+    try {
+      const res = await fetch('/api/wallet/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: EXCHANGE_RATE }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error === 'INSUFFICIENT_ESSENCIA'
+          ? `Necesitas ${EXCHANGE_RATE} GOLD para cambiar.`
+          : 'Error al cambiar.')
+        return
+      }
+      onPurchase({ essencia: data.essencia, therianCoin: data.therianCoin })
+    } catch {
+      setError('Error de conexión.')
+    } finally {
+      setExchanging(false)
+    }
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#13131F] shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-[#13131F] border-b border-white/5 px-5 pt-5 pb-3 z-10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-white font-bold text-sm uppercase tracking-widest">Tienda</h2>
+            <button
+              onClick={onClose}
+              className="text-white/30 hover:text-white/70 text-xl leading-none transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Balance */}
+          <div className="flex items-center gap-3 text-xs font-mono mb-3">
+            <span className="flex items-center gap-1 text-amber-400">
+              <span>🪙</span>
+              <span className="font-semibold">{wallet.essencia.toLocaleString('es-AR')} GOLD</span>
+            </span>
+            <span className="text-white/20">|</span>
+            <span className="flex items-center gap-1 text-blue-400">
+              <span>🪙</span>
+              <span className="font-semibold">{wallet.therianCoin.toLocaleString('es-AR')} ESENCIA</span>
+            </span>
+          </div>
+
+          {/* Exchange */}
+          <button
+            onClick={handleExchange}
+            disabled={exchanging || wallet.essencia < EXCHANGE_RATE}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {exchanging ? '⏳ Canjeando...' : `🪙 ${EXCHANGE_RATE} GOLD → 🪙 1 ESENCIA`}
+          </button>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mt-3">
+            {(['essencia', 'coin'] as Tab[]).map(t => (
+              <button
+                key={t}
+                onClick={() => { setTab(t); setError(null); setRenamingId(null) }}
+                className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
+                  tab === t
+                    ? t === 'essencia'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-blue-900/30 text-blue-400 border border-blue-700/40'
+                    : 'text-white/30 hover:text-white/60'
+                }`}
+              >
+                {t === 'essencia' ? '🪙 GOLD' : '🪙 ESENCIA'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="px-4 py-3 space-y-3">
+          {error && (
+            <p className="text-red-400 text-xs text-center italic">{error}</p>
+          )}
+
+          {displayItems.map(item => {
+            const owned = item.type === 'cosmetic' && item.accessoryId
+              ? therian.accessories?.includes(item.accessoryId)
+              : false
+            const isLoadingThis = loading === item.id
+            const cost = item.costEssencia > 0 ? item.costEssencia : item.costCoin
+            const costLabel = item.costEssencia > 0
+              ? `${cost.toLocaleString('es-AR')} 🪙`
+              : `${cost} 🪙`
+            const canAfford = item.costEssencia > 0
+              ? wallet.essencia >= item.costEssencia
+              : wallet.therianCoin >= item.costCoin
+
+            return (
+              <div
+                key={item.id}
+                className="rounded-xl border border-white/5 bg-white/3 p-4 space-y-2"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{item.emoji}</span>
+                    <div>
+                      <p className="text-white font-semibold text-sm">{item.name}</p>
+                      <p className="text-[#8B84B0] text-xs">{item.description}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-white/60 flex-shrink-0 mt-0.5">{costLabel}</span>
+                </div>
+
+                {/* Rename input */}
+                {item.id === 'rename' && renamingId === 'rename' && (
+                  <input
+                    type="text"
+                    value={renameInput}
+                    onChange={e => setRenameInput(e.target.value)}
+                    placeholder="Nuevo nombre..."
+                    maxLength={24}
+                    className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder-white/30 outline-none focus:border-purple-500/50"
+                    autoFocus
+                  />
+                )}
+
+                {owned ? (
+                  <div className="text-center text-xs text-[#8B84B0] italic py-0.5">
+                    ✓ Ya tienes esto
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleBuy(item.id)}
+                    disabled={isLoadingThis || !canAfford}
+                    className={`w-full rounded-lg py-2 text-xs font-semibold transition-all ${
+                      !canAfford
+                        ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                        : item.id === 'rename' && renamingId !== 'rename'
+                        ? 'border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                        : 'bg-gradient-to-r from-purple-700 to-purple-500 text-white hover:from-purple-600 hover:to-purple-400'
+                    }`}
+                  >
+                    {isLoadingThis ? '⏳ Procesando...'
+                      : item.id === 'rename' && renamingId === 'rename' ? 'Confirmar nombre'
+                      : item.id === 'rename' ? 'Cambiar nombre'
+                      : 'Comprar'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}

@@ -75,6 +75,7 @@ export function toTherianDTO(therian: Therian) {
     nextActionAt,
     canBite,
     nextBiteAt,
+    accessories: JSON.parse(therian.accessories ?? '[]') as string[],
     createdAt: therian.createdAt.toISOString(),
   }
 }

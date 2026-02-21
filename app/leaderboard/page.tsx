@@ -19,8 +19,9 @@ export default async function LeaderboardPage() {
 
   let userRank: number | null = null
   if (session?.user?.id) {
-    const userTherian = await db.therian.findUnique({
+    const userTherian = await db.therian.findFirst({
       where: { userId: session.user.id },
+      orderBy: { bites: 'desc' },
     })
     if (userTherian) {
       const aboveCount = await db.therian.count({

@@ -25,7 +25,7 @@ export default function AdoptPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        if (data.error === 'ALREADY_HAS_THERIAN') {
+        if (data.error === 'NO_SLOTS_AVAILABLE') {
           router.push('/therian')
           return
         }

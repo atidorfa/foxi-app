@@ -1,11 +1,14 @@
 services:
   db:
-    image: postgres:16
+    build:
+      context: .
+      dockerfile: Dockerfile.db
     container_name: therian-dev-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: devpassword
       POSTGRES_DB: therian_dev
+    command: ["postgres", "-c", "timezone=UTC"]
     ports:
       - "5435:5432"
     volumes:

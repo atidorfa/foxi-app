@@ -16,7 +16,10 @@ model User {
   name               String?
   emailVerified      DateTime?
   createdAt          DateTime            @default(now())
-  therian            Therian?
+  essencia           Int                 @default(0)
+  therianCoin        Int                 @default(0)
+  therianSlots       Int                 @default(1)
+  therians           Therian[]
   verificationTokens VerificationToken[]
 }
 
@@ -31,7 +34,7 @@ model VerificationToken {
 
 model Therian {
   id           String      @id @default(uuid())
-  userId       String      @unique
+  userId       String
   user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   speciesId    String
   rarity       String
@@ -49,6 +52,7 @@ model Therian {
   name        String?   @unique
   bites       Int       @default(0)
   lastBiteAt  DateTime?
+  accessories String    @default("[]") @db.Text
 
   battlesAsChallenger BattleLog[] @relation("Challenger")
   battlesAsTarget     BattleLog[] @relation("Target")

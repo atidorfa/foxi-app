@@ -10,8 +10,9 @@ export async function GET() {
     return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 })
   }
 
-  let therian = await db.therian.findUnique({
+  let therian = await db.therian.findFirst({
     where: { userId: session.user.id },
+    orderBy: { createdAt: 'asc' },
   })
 
   if (!therian) {

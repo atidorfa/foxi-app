@@ -9,6 +9,7 @@ import { z } from 'zod'
 
 const schema = z.object({
   action_type: z.enum(['CARE', 'TRAIN', 'EXPLORE', 'SOCIAL']),
+  therianId:   z.string(),
 })
 
 const COOLDOWN_MS = 24 * 60 * 60 * 1000
@@ -30,8 +31,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'INVALID_INPUT' }, { status: 400 })
   }
 
-  const therian = await db.therian.findUnique({
-    where: { userId: session.user.id },
+  const therian = await db.therian.findFirst({
+    where: { id: body.therianId, userId: session.user.id },
   })
 
   if (!therian) {
@@ -81,12 +82,17 @@ export async function POST(req: NextRequest) {
     },
   })
 
+  await db.user.update({
+    where: { id: session.user.id },
+    data: { essencia: { increment: delta.essencia } },
+  })
+
   // Log de la acción
   await db.actionLog.create({
     data: {
       therianId:  therian.id,
       actionType,
-      delta:      JSON.stringify({ stat: delta.stat, amount: delta.amount, xp: delta.xp }),
+      delta:      JSON.stringify({ stat: delta.stat, amount: delta.amount, xp: delta.xp, essencia: delta.essencia }),
       narrative,
     },
   })
@@ -96,5 +102,6 @@ export async function POST(req: NextRequest) {
     narrative,
     delta: { stat: delta.stat, amount: delta.amount, xp: delta.xp },
     levelUp: level > therian.level,
+    essenciaEarned: delta.essencia,
   })
 }

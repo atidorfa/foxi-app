@@ -54,9 +54,9 @@ export const ACTION_LABELS: Record<ActionType, { label: string; icon: string; co
   SOCIAL:  { label: 'Socializar', icon: '✨', color: 'pink' },
 }
 
-export const ACTION_DELTAS: Record<ActionType, { stat: keyof import('../generation/engine').TherianStats; amount: number; xp: number }> = {
-  CARE:    { stat: 'vitality', amount: 3, xp: 10 },
-  TRAIN:   { stat: 'agility',  amount: 3, xp: 10 },
-  EXPLORE: { stat: 'instinct', amount: 3, xp: 10 },
-  SOCIAL:  { stat: 'charisma', amount: 3, xp: 10 },
+export const ACTION_DELTAS: Record<ActionType, { stat: keyof import('../generation/engine').TherianStats; amount: number; xp: number; essencia: number }> = {
+  CARE:    { stat: 'vitality', amount: 3, xp: 10, essencia: 10 },
+  TRAIN:   { stat: 'agility',  amount: 3, xp: 10, essencia: 10 },
+  EXPLORE: { stat: 'instinct', amount: 3, xp: 10, essencia: 10 },
+  SOCIAL:  { stat: 'charisma', amount: 3, xp: 10, essencia: 10 },
 }
