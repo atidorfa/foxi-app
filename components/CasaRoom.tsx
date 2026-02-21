@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import type { TherianDTO } from '@/lib/therian-dto'
-
-// Rive canvas — no SSR
-const TherianAvatarEvolved = dynamic(() => import('./TherianAvatarEvolved'), { ssr: false })
+// TherianAvatar routes by level: 1→SVG blob, 2→Rive/evolved, 3→chibi
+// It handles its own dynamic imports internally
+import TherianAvatar from './TherianAvatar'
 
 interface Props {
   therian: TherianDTO
@@ -392,7 +391,7 @@ export default function CasaRoom({ therian }: Props) {
               zIndex: 10,
             }}
           >
-            <TherianAvatarEvolved
+            <TherianAvatar
               therian={therian}
               size={180}
               isWalking={isWalking}

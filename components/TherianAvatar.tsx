@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import TherianAvatarSVG from './TherianAvatarSVG'
+import TherianAvatarChibi from './TherianAvatarChibi'
 import type { TherianDTO } from '@/lib/therian-dto'
 
 // Loaded dynamically — Rive needs canvas (no SSR)
@@ -11,7 +12,6 @@ interface Props {
   therian: TherianDTO
   size?: number
   animated?: boolean
-  // Forwarded to TherianAvatarEvolved when level >= 2:
   isWalking?: boolean
   isJumping?: boolean
   facingRight?: boolean
@@ -29,6 +29,20 @@ export default function TherianAvatar({
   speed,
   onActionTrigger,
 }: Props) {
+  // Level 3+: chibi egg-head form (fully animated SVG)
+  if (therian.level >= 3) {
+    return (
+      <TherianAvatarChibi
+        therian={therian}
+        size={size}
+        animated={animated}
+        isWalking={isWalking}
+        isJumping={isJumping}
+      />
+    )
+  }
+
+  // Level 2: evolved form with Rive canvas (falls back to SVG with limbs)
   if (therian.level >= 2) {
     return (
       <TherianAvatarEvolved
@@ -44,5 +58,6 @@ export default function TherianAvatar({
     )
   }
 
+  // Level 1: simple blob SVG, no limbs
   return <TherianAvatarSVG therian={therian} size={size} animated={animated} />
 }
