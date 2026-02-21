@@ -43,6 +43,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const [narrative, setNarrative] = useState<string | null>(null)
   const [lastDelta, setLastDelta] = useState<{ stat: string; amount: number } | null>(null)
   const [levelUp, setLevelUp] = useState(false)
+  const [showEvolution, setShowEvolution] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showActionPopup, setShowActionPopup] = useState(false)
 
@@ -67,6 +68,15 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   useEffect(() => {
     if (editingName) nameInputRef.current?.focus()
   }, [editingName])
+
+  // Trigger evolution overlay when therian transitions to level 2
+  useEffect(() => {
+    if (levelUp && therian.level === 2) {
+      setShowEvolution(true)
+      const t = setTimeout(() => setShowEvolution(false), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [levelUp, therian.level])
 
   const handleNameSave = async () => {
     const trimmed = nameInput.trim()
@@ -303,19 +313,20 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
           <RarityBadge rarity={therian.rarity} />
         </div>
 
-        {/* Battle nav links */}
-        <div className="flex gap-2">
+        {/* Battle nav links — grid 2 cols: Jaula debajo de Morder, mismo tamaño */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Col 1 fila 1: Morder */}
           {therian.canBite ? (
             <button
               onClick={() => setShowBitePopup(true)}
-              className="flex-1 text-center py-2 rounded-lg border border-red-500/30 bg-red-500/8 text-red-300 hover:bg-red-500/15 hover:border-red-500/50 text-sm font-semibold transition-colors"
+              className="text-center py-2 rounded-lg border border-red-500/30 bg-red-500/8 text-red-300 hover:bg-red-500/15 hover:border-red-500/50 text-sm font-semibold transition-colors"
             >
               ⚔️ Morder
             </button>
           ) : (
             <button
               onClick={() => setShowBitePopup(true)}
-              className="group flex-1 rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 transition-colors"
+              className="group rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 transition-colors"
             >
               <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">⚔️ Morder</p>
               <p className="text-white/50 text-xs leading-none group-hover:hidden">
@@ -328,10 +339,12 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               </p>
             </button>
           )}
+
+          {/* Col 2 fila 1: Acción */}
           {therian.canAct ? (
             <button
               onClick={() => setShowActionPopup(true)}
-              className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-center hover:bg-emerald-500/15 hover:border-emerald-500/50 transition-colors"
+              className="rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-center hover:bg-emerald-500/15 hover:border-emerald-500/50 transition-colors"
             >
               <p className="text-emerald-400 text-xs font-semibold leading-none mb-0.5">🌿 Acción</p>
               <p className="text-emerald-400/70 text-xs leading-none">Disponible</p>
@@ -339,7 +352,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
           ) : (
             <button
               onClick={() => setShowActionPopup(true)}
-              className="group flex-1 rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 transition-colors"
+              className="group rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 transition-colors"
             >
               <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">🌿 Acción</p>
               <p className="text-white/50 text-xs leading-none group-hover:hidden">
@@ -352,7 +365,22 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               </p>
             </button>
           )}
-          
+
+          {/* Col 1 fila 2: Jaula — mismo tamaño que Morder, exactamente debajo */}
+          {therian.level >= 2 ? (
+            <Link
+              href="/casa"
+              className="rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-center hover:bg-amber-500/15 hover:border-amber-500/50 transition-colors"
+            >
+              <p className="text-amber-400 text-xs font-semibold leading-none mb-0.5">🏠 Jaula</p>
+              <p className="text-amber-400/70 text-xs leading-none">Entrar</p>
+            </Link>
+          ) : (
+            <div className="rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center opacity-50 cursor-not-allowed">
+              <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">🏠 Jaula</p>
+              <p className="text-white/30 text-xs leading-none">Nivel 2</p>
+            </div>
+          )}
         </div>
 
         {/* Avatar */}
@@ -411,6 +439,42 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
         </p>
 
       </div>
+
+      {/* Evolution overlay — aparece cuando el Therian pasa a nivel 2 */}
+      {showEvolution && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85">
+          <div className="relative flex items-center justify-center">
+            {/* Anillos de ping concéntricos */}
+            <span className="absolute inline-flex h-64 w-64 rounded-full bg-amber-400 opacity-20 animate-ping" />
+            <span
+              className="absolute inline-flex h-48 w-48 rounded-full bg-amber-400 opacity-15 animate-ping"
+              style={{ animationDelay: '0.3s' }}
+            />
+            <span
+              className="absolute inline-flex h-32 w-32 rounded-full bg-amber-400 opacity-10 animate-ping"
+              style={{ animationDelay: '0.6s' }}
+            />
+            {/* Avatar centrado */}
+            <div className="relative z-10">
+              <TherianAvatar therian={therian} size={240} animated />
+            </div>
+          </div>
+          <div className="mt-10 text-center">
+            <p
+              className="text-5xl font-bold text-amber-400 tracking-widest uppercase"
+              style={{ textShadow: '0 0 20px rgba(252,211,77,0.9), 0 0 60px rgba(252,211,77,0.4)' }}
+            >
+              ¡EVOLUCIÓN!
+            </p>
+            <p className="text-amber-300/70 text-sm mt-3">
+              Tu Therian ha alcanzado el nivel 2 y ha ganado extremidades
+            </p>
+            <p className="text-amber-300/40 text-xs mt-1">
+              La Jaula ya está disponible
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bite popup */}
       {showBitePopup && (
