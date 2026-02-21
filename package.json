@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@rive-app/react-canvas": "^4.27.0",
     "@types/nodemailer": "^7.0.10",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
