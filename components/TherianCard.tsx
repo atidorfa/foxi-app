@@ -23,7 +23,8 @@ const STAT_CONFIG = [
   { key: 'charisma' as const, label: 'Carisma',   icon: '✨', color: 'charisma' },
 ]
 
-function timeRemaining(isoString: string): string {
+function timeRemaining(isoString: string | null): string {
+  if (!isoString) return 'Ya disponible'
   const diff = new Date(isoString).getTime() - Date.now()
   if (diff <= 0) return 'Ya disponible'
   const h = Math.floor(diff / 3_600_000)
@@ -40,11 +41,17 @@ const RARITY_GLOW: Record<string, string> = {
 
 export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const [therian, setTherian] = useState(initialTherian)
+
+  // Sync prop changes from parent (e.g. equipping a rune)
+  useEffect(() => {
+    setTherian(initialTherian)
+  }, [initialTherian])
   const [narrative, setNarrative] = useState<string | null>(null)
   const [lastDelta, setLastDelta] = useState<{ stat: string; amount: number } | null>(null)
   const [levelUp, setLevelUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showActionPopup, setShowActionPopup] = useState(false)
+  const [showStats, setShowStats] = useState(false)
 
   // Bite popup
   const [showBitePopup, setShowBitePopup] = useState(false)
@@ -220,19 +227,70 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const glowClass = RARITY_GLOW[therian.rarity] ?? RARITY_GLOW.COMMON
 
   return (
-    <div className={`
-      relative rounded-2xl border bg-[#13131F] overflow-hidden
-      ${glowClass} transition-shadow duration-500
-    `}>
-      {/* Fondo decorativo */}
-      <div
-        className="absolute inset-0 opacity-5 pointer-events-none"
-        style={{
-          background: `radial-gradient(ellipse at 50% 0%, ${therian.appearance.paletteColors.primary}, transparent 70%)`,
-        }}
-      />
+    <div className="relative w-full z-10 flex text-left font-sans group/card">
+      {/* Side Stats Panel */}
+      <div 
+        className={`absolute top-[2%] bottom-[2%] right-0 w-[90%] z-0 border-y border-r border-white/10 bg-[#0F0F1A] rounded-r-2xl shadow-xl flex items-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          showStats ? 'translate-x-[95%]' : 'translate-x-[12px]'
+        }`}
+      >
+        <div className={`w-full p-6 pl-10 flex flex-col justify-center space-y-6 transition-opacity duration-300 ${showStats ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'}`}>
+          <div className="space-y-4">
+            <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold flex items-center justify-between">
+              Stats
+            </h3>
+            {STAT_CONFIG.map((cfg) => (
+              <StatBar
+                key={cfg.key}
+                label={cfg.label}
+                icon={cfg.icon}
+                value={therian.stats[cfg.key]}
+                color={cfg.color}
+                delta={lastDelta?.stat === cfg.key ? lastDelta.amount : undefined}
+              />
+            ))}
+          </div>
+          <div className="space-y-1 pt-4 border-t border-white/5">
+            <div className="flex justify-between text-xs text-[#8B84B0] mb-2">
+              <span>XP</span>
+              <span className="font-mono">{therian.xp} / {therian.xpToNext}</span>
+            </div>
+            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full transition-all duration-1000"
+                style={{ width: `${xpPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
 
-      <div className="relative p-6 space-y-6">
+        {/* Toggle arrow button attached to the right edge */}
+        <button
+           onClick={() => setShowStats(!showStats)}
+           className={`absolute top-1/2 -right-7 -translate-y-1/2 w-7 h-16 bg-[#0F0F1A] border-y border-r border-white/10 rounded-r-xl flex items-center justify-center hover:bg-[#1a1a2e] transition-all text-white/50 hover:text-white cursor-pointer shadow-md z-10 ${!showStats && 'group-hover/card:translate-x-1'}`}
+        >
+          <span className={`transition-transform duration-500 text-[10px] ${showStats ? 'rotate-180' : ''}`}>
+             ▶
+          </span>
+        </button>
+      </div>
+
+      {/* Main Card (Front) */}
+      <div className={`
+        relative z-10 w-full rounded-2xl border bg-[#13131F]
+        ${glowClass} transition-shadow duration-500 shadow-2xl
+      `}>
+        {/* Fondo decorativo aislante de overflow */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
+          <div
+            className="absolute inset-0 opacity-5"
+            style={{
+              background: `radial-gradient(ellipse at 50% 0%, ${therian.appearance.paletteColors.primary}, transparent 70%)`,
+            }}
+          />
+        </div>
+
+        <div className="relative p-6 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0 pr-3">
@@ -376,40 +434,14 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
           <p className="text-[#A99DC0] italic text-sm mt-1">{therian.trait.lore}</p>
         </div>
 
-        {/* Stats */}
-        <div className="space-y-3">
-          <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest">Stats</h3>
-          {STAT_CONFIG.map((cfg) => (
-            <StatBar
-              key={cfg.key}
-              label={cfg.label}
-              icon={cfg.icon}
-              value={therian.stats[cfg.key]}
-              color={cfg.color}
-              delta={lastDelta?.stat === cfg.key ? lastDelta.amount : undefined}
-            />
-          ))}
-        </div>
 
-        {/* XP Bar */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-[#8B84B0]">
-            <span>XP</span>
-            <span className="font-mono">{therian.xp} / {therian.xpToNext}</span>
-          </div>
-          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full transition-all duration-1000"
-              style={{ width: `${xpPct}%` }}
-            />
-          </div>
-        </div>
 
         {/* Adoption date */}
         <p className="text-center text-[#4A4468] text-xs italic">
           Adoptado el {new Date(therian.createdAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
 
+      </div>
       </div>
 
       {/* Bite popup */}
@@ -474,21 +506,23 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
             )}
 
             {/* Target preview */}
-            {bitePhase === 'preview' && targetTherian && (
+            {bitePhase === 'preview' && targetTherian && (() => {
+              const target = targetTherian;
+              return (
               <div className="rounded-xl border border-white/10 bg-white/3 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-white font-bold">{targetTherian.name}</div>
-                    <div className="text-[#8B84B0] text-sm">{targetTherian.species.emoji} {targetTherian.species.name} · Nv {targetTherian.level}</div>
+                    <div className="text-white font-bold">{target.name}</div>
+                    <div className="text-[#8B84B0] text-sm">{target.species.emoji} {target.species.name} · Nv {target.level}</div>
                   </div>
                   <div className="text-right">
                     <div className={`text-sm font-semibold ${
-                      targetTherian.rarity === 'LEGENDARY' ? 'text-amber-400'
-                      : targetTherian.rarity === 'EPIC' ? 'text-purple-400'
-                      : targetTherian.rarity === 'RARE' ? 'text-blue-400'
+                      target.rarity === 'LEGENDARY' ? 'text-amber-400'
+                      : target.rarity === 'EPIC' ? 'text-purple-400'
+                      : target.rarity === 'RARE' ? 'text-blue-400'
                       : 'text-slate-400'
-                    }`}>{targetTherian.rarity}</div>
-                    <div className="text-[#8B84B0] text-sm">{targetTherian.bites} 🦷</div>
+                    }`}>{target.rarity}</div>
+                    <div className="text-[#8B84B0] text-sm">{target.bites} 🦷</div>
                   </div>
                 </div>
                 {/* Stats comparison */}
@@ -500,7 +534,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                   </div>
                   {([['vitality','🌿'],['agility','⚡'],['instinct','🌌'],['charisma','✨']] as const).map(([k, icon]) => {
                     const mine = therian.stats[k]
-                    const theirs = targetTherian.stats[k]
+                    const theirs = target.stats[k]
                     const iWin = mine > theirs
                     const theyWin = theirs > mine
                     return (
@@ -516,7 +550,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                     )
                   })}
                 </div>
-                {targetTherian.id === therian.id && (
+                {target.id === therian.id && (
                   <p className="text-amber-400 text-xs text-center">No puedes morderte a ti mismo.</p>
                 )}
                 {biteError && <p className="text-red-400 text-xs text-center">{biteError}</p>}
@@ -529,20 +563,20 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                   </button>
                   <button
                     onClick={handleBite}
-                    disabled={biting || !therian.canBite || targetTherian.id === therian.id}
+                    disabled={biting || !therian.canBite || target.id === therian.id}
                     className="flex-1 py-2.5 rounded-xl font-bold text-white text-sm bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     {biting ? 'Iniciando...' : therian.canBite ? '🦷 ¡Morder!' : '⏳ Cooldown'}
                   </button>
                 </div>
               </div>
-            )}
+            )})()}
 
             {/* Battle arena */}
             {(bitePhase === 'fighting' || bitePhase === 'result') && battleResult && targetTherian && (
               <BattleArena
                 challenger={therian}
-                target={targetTherian}
+                target={targetTherian as any}
                 result={battleResult}
                 onComplete={() => setBitePhase('result')}
               />

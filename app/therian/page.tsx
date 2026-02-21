@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { toTherianDTO } from '@/lib/therian-dto'
-import TherianCard from '@/components/TherianCard'
+import RuneSystem from '@/components/RuneSystem'
 import SignOutButton from '@/components/SignOutButton'
 
 export const dynamic = 'force-dynamic'
@@ -56,7 +56,7 @@ export default async function TherianPage() {
 
       {/* Content */}
       <main className="relative z-10 max-w-md mx-auto px-4 py-8">
-        <TherianCard therian={dto} rank={userRank}/>
+        <RuneSystem therian={dto} rank={userRank}/>
       </main>
     </div>
   )

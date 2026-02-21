@@ -43,6 +43,7 @@ model Therian {
   xp           Int         @default(0)
   lastActionAt DateTime?
   createdAt    DateTime    @default(now())
+  equippedRunes String     @default("[]") @db.Text
   actionLogs   ActionLog[]
 
   name        String?   @unique

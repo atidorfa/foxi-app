@@ -2,6 +2,7 @@ import type { Therian } from '@prisma/client'
 import { getSpeciesById } from './catalogs/species'
 import { getTraitById } from './catalogs/traits'
 import { getPaletteById } from './catalogs/appearance'
+import { getRuneById, type Rune } from './catalogs/runes'
 import type { TherianStats, TherianAppearance, Rarity } from './generation/engine'
 
 const COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24 horas
@@ -11,7 +12,19 @@ function xpToNextLevel(level: number): number {
 }
 
 export function toTherianDTO(therian: Therian) {
-  const stats: TherianStats = JSON.parse(therian.stats)
+  const baseStats: TherianStats = JSON.parse(therian.stats)
+  
+  const equippedRunesIds: string[] = JSON.parse(therian.equippedRunes || '[]')
+  const equippedRunes = equippedRunesIds.map(id => getRuneById(id)!).filter(Boolean)
+
+  const stats = { ...baseStats }
+  for (const rune of equippedRunes) {
+    if (rune.mod.vitality) stats.vitality += rune.mod.vitality
+    if (rune.mod.agility) stats.agility += rune.mod.agility
+    if (rune.mod.instinct) stats.instinct += rune.mod.instinct
+    if (rune.mod.charisma) stats.charisma += rune.mod.charisma
+  }
+
   const appearance: TherianAppearance = JSON.parse(therian.appearance)
   const species = getSpeciesById(therian.speciesId)
   const trait = getTraitById(therian.traitId)
@@ -51,6 +64,9 @@ export function toTherianDTO(therian: Therian) {
       signature: appearance.signature,
     },
     stats,
+    baseStats,
+    equippedRunes,
+    equippedRunesIds,
     level: therian.level,
     xp: therian.xp,
     xpToNext: xpToNextLevel(therian.level),
