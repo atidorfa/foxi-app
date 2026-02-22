@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import type { TherianDTO } from '@/lib/therian-dto'
 import TherianAvatar from './TherianAvatar'
 import RarityBadge from './RarityBadge'
@@ -16,6 +17,8 @@ interface LeaderboardEntry {
   appearance: {
     paletteColors: { primary: string; secondary: string; accent: string }
   }
+  ownerId?: string
+  ownerName?: string
 }
 
 interface Props {
@@ -24,16 +27,18 @@ interface Props {
 }
 
 const RARITY_LABEL: Record<string, string> = {
-  COMMON: 'Común', RARE: 'Raro', EPIC: 'Épico', LEGENDARY: 'Legendario',
+  COMMON: 'Común', UNCOMMON: 'Poco común', RARE: 'Raro', EPIC: 'Épico', LEGENDARY: 'Legendario', MYTHIC: 'Mítico',
 }
 const RARITY_COLOR: Record<string, string> = {
-  COMMON: 'text-slate-400', RARE: 'text-blue-400', EPIC: 'text-purple-400', LEGENDARY: 'text-amber-400',
+  COMMON: 'text-slate-400', UNCOMMON: 'text-emerald-400', RARE: 'text-blue-400', EPIC: 'text-purple-400', LEGENDARY: 'text-amber-400', MYTHIC: 'text-red-400',
 }
 const RARITY_GLOW: Record<string, string> = {
   COMMON:    'border-white/10',
+  UNCOMMON:  'border-emerald-500/30 shadow-[0_0_20px_rgba(52,211,153,0.1)]',
   RARE:      'border-blue-500/30 shadow-[0_0_30px_rgba(96,165,250,0.1)]',
   EPIC:      'border-purple-500/40 shadow-[0_0_40px_rgba(192,132,252,0.15)]',
   LEGENDARY: 'border-amber-500/50 shadow-[0_0_50px_rgba(252,211,77,0.2)]',
+  MYTHIC:    'border-red-500/60 shadow-[0_0_60px_rgba(239,68,68,0.25)]',
 }
 const RANK_MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
 const STAT_CONFIG = [
@@ -83,13 +88,24 @@ function ProfileModal({
 
         {/* Header bar */}
         <div className="relative flex items-center justify-between px-5 pt-5 pb-2">
-          <div className="flex items-center gap-2">
-            {RANK_MEDAL[entry.rank] ? (
-              <span className="text-xl">{RANK_MEDAL[entry.rank]}</span>
-            ) : (
-              <span className="text-[#4A4468] font-mono text-sm">#{entry.rank}</span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              {RANK_MEDAL[entry.rank] ? (
+                <span className="text-xl">{RANK_MEDAL[entry.rank]}</span>
+              ) : (
+                <span className="text-[#4A4468] font-mono text-sm">#{entry.rank}</span>
+              )}
+              <span className="text-white font-bold truncate max-w-[180px]">{entry.name}</span>
+            </div>
+            {entry.ownerId && entry.ownerName && (
+              <Link
+                href={`/user/${entry.ownerId}`}
+                onClick={onClose}
+                className="text-purple-400/70 hover:text-purple-300 text-xs transition-colors pl-0.5"
+              >
+                @{entry.ownerName} →
+              </Link>
             )}
-            <span className="text-white font-bold truncate max-w-[180px]">{entry.name}</span>
           </div>
           <button
             onClick={onClose}
@@ -233,8 +249,20 @@ export default function LeaderboardTable({ entries, userRank }: Props) {
                   {RARITY_LABEL[entry.rarity] ?? entry.rarity}
                 </span>
               </div>
-              <div className="text-[#8B84B0] text-xs">
-                {entry.species.emoji} {entry.species.name} · Nv {entry.level}
+              <div className="text-[#8B84B0] text-xs flex items-center gap-1.5">
+                <span>{entry.species.emoji} {entry.species.name} · Nv {entry.level}</span>
+                {entry.ownerId && entry.ownerName && (
+                  <>
+                    <span className="text-white/15">·</span>
+                    <Link
+                      href={`/user/${entry.ownerId}`}
+                      onClick={e => e.stopPropagation()}
+                      className="text-purple-400/70 hover:text-purple-300 transition-colors"
+                    >
+                      @{entry.ownerName}
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 

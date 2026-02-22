@@ -8,6 +8,7 @@ import { SHOP_ITEMS } from '@/lib/shop/catalog'
 interface Wallet {
   essencia: number
   therianCoin: number
+  therianSlots: number
 }
 
 interface Props {
@@ -172,6 +173,8 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
           {displayItems.map(item => {
             const owned = item.type === 'cosmetic' && item.accessoryId
               ? therian.accessories?.includes(item.accessoryId)
+              : item.type === 'slot'
+              ? wallet.therianSlots >= 8
               : false
             const isLoadingThis = loading === item.id
             const cost = item.costEssencia > 0 ? item.costEssencia : item.costCoin
@@ -213,7 +216,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
 
                 {owned ? (
                   <div className="text-center text-xs text-[#8B84B0] italic py-0.5">
-                    ✓ Ya tienes esto
+                    {item.type === 'slot' ? '✓ Máximo de slots alcanzado (8/8)' : '✓ Ya tienes esto'}
                   </div>
                 ) : (
                   <button

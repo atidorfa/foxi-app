@@ -76,10 +76,12 @@ export default function AdoptPage() {
             <div className="rounded-2xl border border-white/8 bg-[#13131F]/80 p-6 space-y-3">
               <p className="text-[#8B84B0] text-xs uppercase tracking-widest text-center mb-4">Probabilidades</p>
               {[
-                { rarity: 'COMMON' as const,    pct: '70%', color: 'text-gray-400' },
-                { rarity: 'RARE' as const,      pct: '20%', color: 'text-blue-400' },
-                { rarity: 'EPIC' as const,      pct: '9%',  color: 'text-purple-400' },
-                { rarity: 'LEGENDARY' as const, pct: '1%',  color: 'text-amber-400' },
+                { rarity: 'COMMON'    as const, pct: '60%',     color: 'text-gray-400' },
+                { rarity: 'UNCOMMON'  as const, pct: '25%',     color: 'text-emerald-400' },
+                { rarity: 'RARE'      as const, pct: '10%',     color: 'text-blue-400' },
+                { rarity: 'EPIC'      as const, pct: '4%',      color: 'text-purple-400' },
+                { rarity: 'LEGENDARY' as const, pct: '0.999%',  color: 'text-amber-400' },
+                { rarity: 'MYTHIC'    as const, pct: '0.001%',  color: 'text-red-400' },
               ].map(({ rarity, pct, color }) => (
                 <div key={rarity} className="flex items-center justify-between">
                   <RarityBadge rarity={rarity} size="sm"/>

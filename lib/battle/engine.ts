@@ -27,10 +27,12 @@ export interface Combatant {
 }
 
 const RARITY_BONUS: Record<string, number> = {
-  COMMON: 1.0,
-  RARE: 1.1,
-  EPIC: 1.2,
+  COMMON:    1.0,
+  UNCOMMON:  1.05,
+  RARE:      1.1,
+  EPIC:      1.2,
   LEGENDARY: 1.35,
+  MYTHIC:    1.5,
 }
 
 function getRarityBonus(rarity: string): number {

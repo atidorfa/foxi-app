@@ -15,6 +15,7 @@ export default async function LeaderboardPage() {
     where: { name: { not: null } },
     orderBy: [{ bites: 'desc' }, { level: 'desc' }],
     take: 20,
+    include: { user: { select: { id: true, name: true, email: true } } },
   })
 
   let userRank: number | null = null
@@ -56,6 +57,8 @@ export default async function LeaderboardPage() {
           ? { primary: palette.primary, secondary: palette.secondary, accent: palette.accent }
           : { primary: '#888', secondary: '#555', accent: '#aaa' },
       },
+      ownerId: t.user.id,
+      ownerName: t.user.name ?? t.user.email.split('@')[0],
     }
   })
 

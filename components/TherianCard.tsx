@@ -35,9 +35,11 @@ function timeRemaining(isoString: string | null): string {
 
 const RARITY_GLOW: Record<string, string> = {
   COMMON:    'border-white/10',
+  UNCOMMON:  'border-emerald-500/30 shadow-[0_0_20px_rgba(52,211,153,0.1)]',
   RARE:      'border-blue-500/30 shadow-[0_0_30px_rgba(96,165,250,0.1)]',
   EPIC:      'border-purple-500/40 shadow-[0_0_40px_rgba(192,132,252,0.15)]',
   LEGENDARY: 'border-amber-500/50 shadow-[0_0_50px_rgba(252,211,77,0.2),0_0_100px_rgba(252,211,77,0.05)]',
+  MYTHIC:    'border-red-500/60 shadow-[0_0_60px_rgba(239,68,68,0.25),0_0_120px_rgba(239,68,68,0.1)]',
 }
 
 export default function TherianCard({ therian: initialTherian, rank }: Props) {
@@ -197,6 +199,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
         setGoldEarned(data.goldEarned)
         window.dispatchEvent(new CustomEvent('wallet-update'))
       }
+      window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.challenger }))
     } catch {
       setBiteError('Error de conexión.')
       setBiting(false)
@@ -250,6 +253,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
         setGoldEarned(data.essenciaEarned)
         window.dispatchEvent(new CustomEvent('wallet-update'))
       }
+      window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.therian }))
     } catch {
       setError('Error de conexión.')
     }
@@ -267,6 +271,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
       if (res.ok) {
         const updated = await res.json()
         setTherian(updated)
+        window.dispatchEvent(new CustomEvent('therian-updated', { detail: updated }))
       }
     } catch (e) {
       console.error(e)

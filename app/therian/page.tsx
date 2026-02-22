@@ -7,6 +7,7 @@ import TherianTabs from '@/components/TherianTabs'
 import SignOutButton from '@/components/SignOutButton'
 import CurrencyDisplay from '@/components/CurrencyDisplay'
 import NavShopButton from '@/components/NavShopButton'
+import NavFusionButton from '@/components/NavFusionButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,7 @@ export default async function TherianPage() {
       <nav className="relative z-10 border-b border-white/5 bg-[#08080F]/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between">
         <span className="text-xl font-bold gradient-text">therian.biz</span>
         <div className="flex items-center gap-4">
+          <NavFusionButton />
           <CurrencyDisplay />
           <NavShopButton therian={primaryTherian} />
           <Link href="/leaderboard" className="text-[#8B84B0] hover:text-white text-sm transition-colors">🏆 Top</Link>

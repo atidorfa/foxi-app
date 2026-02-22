@@ -14,16 +14,20 @@ interface Props {
 
 const RARITY_BORDER: Record<string, string> = {
   COMMON:    'border-gray-500/30',
+  UNCOMMON:  'border-emerald-500/40',
   RARE:      'border-blue-500/40',
   EPIC:      'border-purple-500/50',
   LEGENDARY: 'border-amber-500/60',
+  MYTHIC:    'border-red-500/60',
 }
 
 const RARITY_BORDER_ACTIVE: Record<string, string> = {
   COMMON:    'border-gray-400/60 shadow-[0_0_12px_rgba(156,163,175,0.2)]',
+  UNCOMMON:  'border-emerald-400/70 shadow-[0_0_14px_rgba(52,211,153,0.25)]',
   RARE:      'border-blue-400/70 shadow-[0_0_14px_rgba(96,165,250,0.25)]',
   EPIC:      'border-purple-400/80 shadow-[0_0_16px_rgba(192,132,252,0.3)]',
   LEGENDARY: 'border-amber-400/90 shadow-[0_0_20px_rgba(251,191,36,0.35)]',
+  MYTHIC:    'border-red-400/90 shadow-[0_0_24px_rgba(239,68,68,0.4)]',
 }
 
 const ORDER_KEY = 'therian-grid-order'
@@ -52,23 +56,35 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
   const [activeId, setActiveId] = useState<string>(therians[0]?.id ?? '')
   const [dragOver, setDragOver] = useState<number | null>(null)
   const dragIndexRef = useRef<number | null>(null)
-
+  // Local copy of therians updated by TherianCard events (so dots refresh without page reload)
+  const [localTherians, setLocalTherians] = useState<TherianDTO[]>(therians)
   // Load persisted order after mount (client-only)
   useEffect(() => {
     setOrder(loadOrder(therians))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for therian state changes dispatched by TherianCard after action/bite
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const updated = (e as CustomEvent<TherianDTO>).detail
+      if (!updated?.id) return
+      setLocalTherians(prev => prev.map(t => t.id === updated.id ? updated : t))
+    }
+    window.addEventListener('therian-updated', handler)
+    return () => window.removeEventListener('therian-updated', handler)
+  }, [])
 
   const saveOrder = useCallback((newOrder: string[]) => {
     setOrder(newOrder)
     try { localStorage.setItem(ORDER_KEY, JSON.stringify(newOrder)) } catch {}
   }, [])
 
-  // Sorted therians according to order
+  // Sorted therians according to order (uses localTherians so dots refresh live)
   const sortedTherians = order
-    .map(id => therians.find(t => t.id === id))
+    .map(id => localTherians.find(t => t.id === id))
     .filter(Boolean) as TherianDTO[]
 
-  const active = therians.find(t => t.id === activeId) ?? therians[0]
+  const active = localTherians.find(t => t.id === activeId) ?? localTherians[0]
   const hasAvailableSlot = therians.length < slots
   const showGrid = therians.length > 1 || hasAvailableSlot
 

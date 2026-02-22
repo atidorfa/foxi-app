@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (item.type === 'slot') {
+    if (user.therianSlots >= 8) {
+      return NextResponse.json({ error: 'MAX_SLOTS_REACHED' }, { status: 400 })
+    }
     await db.user.update({
       where: { id: session.user.id },
       data: { therianSlots: { increment: 1 } },

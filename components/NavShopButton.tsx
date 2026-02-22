@@ -8,6 +8,7 @@ import ShopModal from './ShopModal'
 interface Wallet {
   essencia: number
   therianCoin: number
+  therianSlots: number
 }
 
 interface Props {

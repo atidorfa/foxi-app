@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest) {
 
   const newName = parsed.data.name.trim()
 
-  const therian = await db.therian.findUnique({
+  const therian = await db.therian.findFirst({
     where: { userId: session.user.id },
   })
   if (!therian) {

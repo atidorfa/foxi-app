@@ -9,7 +9,7 @@ export default async function HomePage() {
     redirect('/login')
   }
 
-  const therian = await db.therian.findUnique({
+  const therian = await db.therian.findFirst({
     where: { userId: session.user.id },
   })
 

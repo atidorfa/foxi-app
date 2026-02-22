@@ -64,8 +64,11 @@ model RuneInventory {
   therianId  String
   therian    Therian  @relation(fields: [therianId], references: [id], onDelete: Cascade)
   runeId     String
+  quantity   Int      @default(1)
+  source     String   @default("unknown") // "action" | "shop" | "battle" | "gift" | "unknown"
   obtainedAt DateTime @default(now())
 
+  @@unique([therianId, runeId])
   @@index([therianId])
 }
 

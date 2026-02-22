@@ -3,7 +3,7 @@ import { SPECIES, getSpeciesById } from '../catalogs/species'
 import { TRAITS, getTraitById } from '../catalogs/traits'
 import { PALETTES, EYES, PATTERNS, SIGNATURES } from '../catalogs/appearance'
 
-export type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
+export type Rarity = 'COMMON' | 'UNCOMMON' | 'RARE' | 'EPIC' | 'LEGENDARY' | 'MYTHIC'
 
 export interface TherianAppearance {
   palette: string
@@ -30,17 +30,21 @@ export interface GeneratedTherian {
 }
 
 const RARITY_WEIGHTS = [
-  { value: 'COMMON' as Rarity,    weight: 70 },
-  { value: 'RARE' as Rarity,      weight: 20 },
-  { value: 'EPIC' as Rarity,      weight:  9 },
-  { value: 'LEGENDARY' as Rarity, weight:  1 },
+  { value: 'COMMON'    as Rarity, weight: 60000 },
+  { value: 'UNCOMMON'  as Rarity, weight: 25000 },
+  { value: 'RARE'      as Rarity, weight: 10000 },
+  { value: 'EPIC'      as Rarity, weight:  4000 },
+  { value: 'LEGENDARY' as Rarity, weight:   999 },
+  { value: 'MYTHIC'    as Rarity, weight:     1 },
 ]
 
 const RARITY_BONUS: Record<Rarity, number> = {
-  COMMON: 0,
-  RARE: 5,
-  EPIC: 12,
+  COMMON:    0,
+  UNCOMMON:  3,
+  RARE:      8,
+  EPIC:     15,
   LEGENDARY: 25,
+  MYTHIC:    40,
 }
 
 function clamp(value: number, min = 1, max = 100): number {
@@ -85,3 +89,39 @@ export function generateTherian(userId: string, secret: string): GeneratedTheria
 
 // Re-exportar para conveniencia
 export { getSpeciesById, getTraitById }
+
+export const RARITY_ORDER: Rarity[] = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC']
+
+export function getNextRarity(rarity: Rarity): Rarity | null {
+  const idx = RARITY_ORDER.indexOf(rarity)
+  if (idx === -1 || idx === RARITY_ORDER.length - 1) return null
+  return RARITY_ORDER[idx + 1]
+}
+
+export function generateTherianWithRarity(userId: string, secret: string, forcedRarity: Rarity): GeneratedTherian {
+  const timestamp = Date.now()
+  const seed = createSeed(userId, timestamp, secret)
+  const rng = createRNG(seed)
+
+  const species = rng.choice(SPECIES)
+  const trait = rng.choice(TRAITS)
+
+  const rarityBonus = RARITY_BONUS[forcedRarity]
+  const base = 50
+
+  const stats: TherianStats = {
+    vitality: clamp(base + rng.range(-10, 10) + species.bias.vitality + trait.mod.vitality + rarityBonus),
+    agility:  clamp(base + rng.range(-10, 10) + species.bias.agility  + trait.mod.agility  + rarityBonus),
+    instinct: clamp(base + rng.range(-10, 10) + species.bias.instinct + trait.mod.instinct + rarityBonus),
+    charisma: clamp(base + rng.range(-10, 10) + species.bias.charisma + trait.mod.charisma + rarityBonus),
+  }
+
+  const appearance: TherianAppearance = {
+    palette:   rng.choice(PALETTES).id,
+    eyes:      rng.choice(EYES).id,
+    pattern:   rng.choice(PATTERNS).id,
+    signature: rng.choice(SIGNATURES).id,
+  }
+
+  return { seed, timestamp, rarity: forcedRarity, speciesId: species.id, traitId: trait.id, stats, appearance }
+}
