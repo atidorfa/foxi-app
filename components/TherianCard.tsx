@@ -11,6 +11,8 @@ import DailyActionButtons from './DailyActionButtons'
 import FlavorText from './FlavorText'
 import BattleArena from './BattleArena'
 import { RUNES, type Rune } from '@/lib/catalogs/runes'
+import { ACCESSORY_SLOTS } from '@/lib/items/accessory-slots'
+import { SHOP_ITEMS } from '@/lib/shop/catalog'
 
 interface Props {
   therian: TherianDTO
@@ -60,6 +62,13 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
   const [equipping, setEquipping] = useState(false)
 
+  // Accessories panel (left side)
+  const [showAccessories, setShowAccessories] = useState(false)
+  const [selectedAccessorySlot, setSelectedAccessorySlot] = useState<string | null>(null)
+  const [equippingAccessory, setEquippingAccessory] = useState(false)
+  const [ownedAccessories, setOwnedAccessories] = useState<{ itemId: string; name: string; emoji: string; description: string }[] | null>(null)
+  const [loadingAccessories, setLoadingAccessories] = useState(false)
+
   // Bite popup
   const [showBitePopup, setShowBitePopup] = useState(false)
   const [bitePhase, setBitePhase] = useState<'search' | 'preview' | 'fighting' | 'result'>('search')
@@ -80,6 +89,68 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
     window.addEventListener('therian-updated', handler)
     return () => window.removeEventListener('therian-updated', handler)
   }, [])
+
+  // Re-fetch accessories when inventory changes (e.g. after a purchase)
+  useEffect(() => {
+    const handler = () => {
+      fetch('/api/inventory')
+        .then(r => r.ok ? r.json() : { items: [] })
+        .then(data => {
+          setOwnedAccessories(
+            (data.items ?? [])
+              .filter((i: { type: string }) => i.type === 'ACCESSORY')
+              .map((i: { itemId: string; name: string; emoji: string; description: string }) => ({
+                itemId: i.itemId, name: i.name, emoji: i.emoji, description: i.description,
+              }))
+          )
+        })
+    }
+    window.addEventListener('inventory-updated', handler)
+    return () => window.removeEventListener('inventory-updated', handler)
+  }, [])
+
+  const openAccessoriesPanel = () => {
+    if (!showAccessories && ownedAccessories === null && !loadingAccessories) {
+      setLoadingAccessories(true)
+      fetch('/api/inventory')
+        .then(r => r.ok ? r.json() : { items: [] })
+        .then(data => {
+          setOwnedAccessories(
+            (data.items ?? [])
+              .filter((i: { type: string }) => i.type === 'ACCESSORY')
+              .map((i: { itemId: string; name: string; emoji: string; description: string }) => ({
+                itemId: i.itemId, name: i.name, emoji: i.emoji, description: i.description,
+              }))
+          )
+          setLoadingAccessories(false)
+        })
+    }
+    setShowAccessories(prev => !prev)
+  }
+
+  const handleEquipAccessory = async (accessoryId: string | null) => {
+    if (!selectedAccessorySlot) return
+    setEquippingAccessory(true)
+    try {
+      const res = await fetch('/api/therian/accessory-equip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therianId: therian.id, slotId: selectedAccessorySlot, accessoryId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTherian(data.therian)
+        window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.therian }))
+        // Refresh inventory: equipped accessories disappear from it, unequipped ones reappear
+        window.dispatchEvent(new Event('inventory-updated'))
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setEquippingAccessory(false)
+      setSelectedAccessorySlot(null)
+    }
+  }
 
   // Name editing
   const [editingName, setEditingName] = useState(false)
@@ -291,6 +362,59 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
 
   return (
     <div className="relative w-full z-10 flex text-left font-sans group/card">
+
+      {/* Accessories Panel (LEFT) */}
+      <div
+        className={`absolute top-[2%] bottom-[2%] left-0 w-[90%] z-0 border-y border-l border-white/10 bg-[#0F0F1A] rounded-l-2xl shadow-xl flex items-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          showAccessories ? '-translate-x-[95%]' : '-translate-x-[12px]'
+        }`}
+      >
+        <div className={`w-full p-5 pr-10 flex flex-col justify-center space-y-4 transition-opacity duration-300 ${showAccessories ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'}`}>
+          <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold">
+            Accesorios
+          </h3>
+          {loadingAccessories ? (
+            <div className="text-white/20 text-xs text-center py-4">Cargando...</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {ACCESSORY_SLOTS.map((slot) => {
+                const equippedAccId = therian.equippedAccessories[slot.id]
+                // instanceId format: "typeId:uuid" (new) or just "typeId" (legacy)
+                const accTypeId = equippedAccId ? (equippedAccId.includes(':') ? equippedAccId.split(':')[0] : equippedAccId) : null
+                const accMeta = accTypeId ? SHOP_ITEMS.find(i => i.accessoryId === accTypeId) : null
+                return (
+                  <button
+                    key={slot.id}
+                    onClick={() => setSelectedAccessorySlot(slot.id)}
+                    className="group border border-white/10 bg-white/3 rounded-xl p-2 text-left hover:border-amber-500/40 hover:bg-amber-950/20 transition-all min-h-[60px] flex flex-col items-start justify-center cursor-pointer"
+                  >
+                    {equippedAccId && accMeta ? (
+                      <div className="text-amber-300 text-[10px] font-bold leading-tight line-clamp-2">
+                        {accMeta.emoji} {accMeta.name}
+                      </div>
+                    ) : (
+                      <div className="text-white/25 text-[9px] uppercase tracking-wider group-hover:text-amber-400/50 transition-colors">
+                        {slot.emoji} {slot.name}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Toggle arrow button attached to the left edge */}
+        <button
+          onClick={openAccessoriesPanel}
+          className={`absolute top-1/2 -left-7 -translate-y-1/2 w-7 h-16 bg-[#0F0F1A] border-y border-l border-white/10 rounded-l-xl flex items-center justify-center hover:bg-[#1a1a2e] transition-all text-white/50 hover:text-white cursor-pointer shadow-md z-10 ${!showAccessories && 'group-hover/card:-translate-x-1'}`}
+        >
+          <span className={`transition-transform duration-500 text-[10px] ${showAccessories ? 'rotate-180' : ''}`}>
+            ◀
+          </span>
+        </button>
+      </div>
+
       {/* Side Stats Panel */}
       <div 
         className={`absolute top-[2%] bottom-[2%] right-0 w-[90%] z-0 border-y border-r border-white/10 bg-[#0F0F1A] rounded-r-2xl shadow-xl flex items-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
@@ -746,6 +870,76 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
           </div>
         </div>
       )}
+
+      {/* Accessory selector modal */}
+      {selectedAccessorySlot !== null && (() => {
+        const slot = ACCESSORY_SLOTS.find(s => s.id === selectedAccessorySlot)!
+        const currentAccId = therian.equippedAccessories[selectedAccessorySlot]
+        const allEquippedIds = new Set(Object.values(therian.equippedAccessories))
+        // Show only accessories for this slot that are NOT currently equipped anywhere
+        const slotAccessories = (ownedAccessories ?? []).filter(a => {
+          const typeId = a.itemId.includes(':') ? a.itemId.split(':')[0] : a.itemId
+          const shopItem = SHOP_ITEMS.find(i => i.accessoryId === typeId)
+          return shopItem?.slot === selectedAccessorySlot && !allEquippedIds.has(a.itemId)
+        })
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={() => !equippingAccessory && setSelectedAccessorySlot(null)}
+          >
+            <div
+              className="bg-[#13131F] border border-white/10 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col overflow-hidden shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-white/10 flex items-center justify-center relative">
+                <h3 className="text-white font-semibold uppercase tracking-widest text-sm">
+                  {slot.emoji} {slot.name}
+                </h3>
+                <button
+                  onClick={() => !equippingAccessory && setSelectedAccessorySlot(null)}
+                  className="absolute right-4 text-white/40 hover:text-white transition-colors"
+                >✕</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {currentAccId && (
+                  <button
+                    disabled={equippingAccessory}
+                    onClick={() => handleEquipAccessory(null)}
+                    className="w-full p-3 rounded-xl border border-white/10 text-[#8B84B0] hover:text-white hover:border-white/30 text-sm text-center disabled:opacity-50 transition-colors"
+                  >
+                    Quitar accesorio actual
+                  </button>
+                )}
+                {slotAccessories.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-white/20 text-sm">
+                      {currentAccId ? 'Este slot ya tiene un accesorio equipado' : 'No tienes accesorios para este slot'}
+                    </p>
+                    {!currentAccId && <p className="text-white/10 text-xs mt-1">Visita la tienda para comprar</p>}
+                  </div>
+                ) : (
+                  slotAccessories.map(acc => (
+                    <button
+                      key={acc.itemId}
+                      onClick={() => handleEquipAccessory(acc.itemId)}
+                      disabled={equippingAccessory}
+                      className="w-full flex items-center gap-3 text-left p-3 rounded-xl border border-white/10 bg-white/3 hover:border-amber-500/50 hover:bg-amber-950/20 active:scale-[0.98] disabled:opacity-50 transition-all"
+                    >
+                      <span className="text-2xl">{acc.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-amber-300 font-bold text-sm leading-tight">{acc.name}</div>
+                        {acc.description && (
+                          <div className="text-[#8B84B0] text-xs mt-0.5 line-clamp-1">{acc.description}</div>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Rune selector modal */}
       {selectedSlot !== null && (

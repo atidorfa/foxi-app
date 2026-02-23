@@ -4,6 +4,27 @@ import { getTraitById } from './catalogs/traits'
 import { getPaletteById } from './catalogs/appearance'
 import { getRuneById, type Rune } from './catalogs/runes'
 import type { TherianStats, TherianAppearance, Rarity } from './generation/engine'
+import { SHOP_ITEMS } from './shop/catalog'
+
+function parseEquippedAccessories(raw: string | null): Record<string, string> {
+  try {
+    const parsed = JSON.parse(raw ?? '{}')
+    if (Array.isArray(parsed)) {
+      // Legacy format: string[] → migrate to slot-keyed object using shop catalog
+      // Elements may be typeIds ("crown") or instanceIds ("crown:uuid") — extract typeId for lookup
+      const result: Record<string, string> = {}
+      for (const accId of parsed as string[]) {
+        const typeId = accId.includes(':') ? accId.split(':')[0] : accId
+        const shopItem = SHOP_ITEMS.find(i => i.accessoryId === typeId)
+        if (shopItem?.slot) result[shopItem.slot] = accId // preserve full instanceId as value
+      }
+      return result
+    }
+    return parsed as Record<string, string>
+  } catch {
+    return {}
+  }
+}
 
 const COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24 horas
 
@@ -75,7 +96,7 @@ export function toTherianDTO(therian: Therian) {
     nextActionAt,
     canBite,
     nextBiteAt,
-    accessories: JSON.parse(therian.accessories ?? '[]') as string[],
+    equippedAccessories: parseEquippedAccessories(therian.accessories ?? null),
     createdAt: therian.createdAt.toISOString(),
   }
 }

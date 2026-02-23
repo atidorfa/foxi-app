@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { TherianDTO } from '@/lib/therian-dto'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
+import { EGGS } from '@/lib/items/eggs'
 
 interface Wallet {
   gold: number
@@ -29,12 +30,21 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [exchanging, setExchanging] = useState(false)
+  const [eggQty, setEggQty] = useState<Record<string, number>>({})
 
   const goldItems = SHOP_ITEMS.filter(i => i.costGold > 0)
   const coinItems = SHOP_ITEMS.filter(i => i.costCoin > 0)
   const displayItems = tab === 'gold' ? goldItems : coinItems
+  const essenciaEggs = EGGS.filter(e => e.currency === 'essencia')
+  const coinEggs = EGGS.filter(e => e.currency === 'therianCoin')
+  const displayEggs = tab === 'essencia' ? essenciaEggs : coinEggs
 
-  async function handleBuy(itemId: string) {
+  function getEggQty(id: string) { return eggQty[id] ?? 1 }
+  function setQty(id: string, val: number) {
+    setEggQty(prev => ({ ...prev, [id]: Math.max(1, Math.min(99, val)) }))
+  }
+
+  async function handleBuy(itemId: string, quantity = 1) {
     setError(null)
 
     if (itemId === 'rename') {
@@ -52,6 +62,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itemId,
+          quantity,
           ...(itemId === 'rename' ? { newName: renameInput.trim() } : {}),
         }),
       })
@@ -69,6 +80,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
       }
       setRenamingId(null)
       setRenameInput('')
+      window.dispatchEvent(new Event('inventory-updated'))
       onPurchase(data.newBalance, data.updatedTherian)
     } catch {
       setError('Error de conexión.')
@@ -172,7 +184,10 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
 
           {displayItems.map(item => {
             const owned = item.type === 'cosmetic' && item.accessoryId
-              ? therian.accessories?.includes(item.accessoryId)
+              ? Object.values(therian.equippedAccessories ?? {}).some(v => {
+                  const typeId = v.includes(':') ? v.split(':')[0] : v
+                  return typeId === item.accessoryId
+                })
               : item.type === 'slot'
               ? wallet.therianSlots >= 8
               : false
@@ -239,6 +254,77 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
               </div>
             )
           })}
+
+          {/* Huevos de Fusión */}
+          {displayEggs.length > 0 && (
+            <>
+              <p className="text-[10px] uppercase tracking-widest text-white/30 pt-1">Huevos de Fusión</p>
+              {displayEggs.map(egg => {
+                const isLoadingThis = loading === egg.id
+                const qty = getEggQty(egg.id)
+                const totalCost = egg.price * qty
+                const canAfford = egg.currency === 'essencia'
+                  ? wallet.essencia >= totalCost
+                  : wallet.therianCoin >= totalCost
+                const costLabel = egg.currency === 'essencia'
+                  ? `${egg.price.toLocaleString('es-AR')} 🪙 c/u`
+                  : `${egg.price} 🪙 c/u`
+                const totalLabel = egg.currency === 'essencia'
+                  ? `${totalCost.toLocaleString('es-AR')} 🪙`
+                  : `${totalCost} 🪙`
+                const RARITY_COLOR: Record<string, string> = {
+                  COMMON: 'text-gray-400', UNCOMMON: 'text-emerald-400', RARE: 'text-blue-400',
+                  EPIC: 'text-purple-400', LEGENDARY: 'text-amber-400', MYTHIC: 'text-red-400',
+                }
+                return (
+                  <div key={egg.id} className="rounded-xl border border-white/5 bg-white/3 p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">{egg.emoji}</span>
+                        <div>
+                          <p className="text-white font-semibold text-sm">{egg.name}</p>
+                          <p className={`text-xs font-semibold ${RARITY_COLOR[egg.rarity]}`}>{egg.description}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono text-white/60 flex-shrink-0 mt-0.5">{costLabel}</span>
+                    </div>
+
+                    {/* Quantity selector */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setQty(egg.id, qty - 1)}
+                          disabled={qty <= 1}
+                          className="px-2.5 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          −
+                        </button>
+                        <span className="w-8 text-center text-sm font-mono text-white font-semibold">{qty}</span>
+                        <button
+                          onClick={() => setQty(egg.id, qty + 1)}
+                          disabled={qty >= 99}
+                          className="px-2.5 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => handleBuy(egg.id, qty)}
+                        disabled={isLoadingThis || !canAfford}
+                        className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                          !canAfford
+                            ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-purple-700 to-purple-500 text-white hover:from-purple-600 hover:to-purple-400'
+                        }`}
+                      >
+                        {isLoadingThis ? '⏳...' : `Comprar ×${qty} · ${totalLabel}`}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
         </div>
       </div>
     </div>,
