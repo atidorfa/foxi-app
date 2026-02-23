@@ -3,18 +3,33 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { TherianDTO } from '@/lib/therian-dto'
+import type { InventoryItemDTO } from '@/app/api/inventory/route'
 import type { Rarity } from '@/lib/generation/engine'
 import TherianAvatar from './TherianAvatar'
 import RarityBadge from './RarityBadge'
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+type EggSlot = {
+  kind: 'egg'
+  itemId: string
+  rarity: string
+  name: string
+  emoji: string
+  availableQty: number
+}
+type TherianSlot = TherianDTO & { kind: 'therian' }
+type FusionSlot = TherianSlot | EggSlot | null
+
 interface Props {
   therians: TherianDTO[]
+  inventory: InventoryItemDTO[]
   onClose: () => void
   onSuccess: () => void
 }
 
 type Phase = 'select' | 'fusing' | 'result'
 
+// ─── Constants ───────────────────────────────────────────────────────────────
 const RARITY_LABEL: Record<string, string> = {
   COMMON: 'Común', UNCOMMON: 'Poco común', RARE: 'Raro',
   EPIC: 'Épico', LEGENDARY: 'Legendario', MYTHIC: 'Mítico',
@@ -38,7 +53,6 @@ const RARITY_BG: Record<string, string> = {
   COMMON: 'bg-gray-500/10', UNCOMMON: 'bg-emerald-500/10', RARE: 'bg-blue-500/10',
   EPIC: 'bg-purple-500/10', LEGENDARY: 'bg-amber-500/10', MYTHIC: 'bg-red-500/10',
 }
-
 const PROB_ROWS = [
   { from: 'COMMON',    to: 'UNCOMMON',  pct: 100, fromColor: 'text-gray-400',    toColor: 'text-emerald-400' },
   { from: 'UNCOMMON',  to: 'RARE',      pct: 70,  fromColor: 'text-emerald-400', toColor: 'text-blue-400' },
@@ -46,26 +60,34 @@ const PROB_ROWS = [
   { from: 'EPIC',      to: 'LEGENDARY', pct: 20,  fromColor: 'text-purple-400',  toColor: 'text-amber-400' },
   { from: 'LEGENDARY', to: 'MYTHIC',    pct: 5,   fromColor: 'text-amber-400',   toColor: 'text-red-400' },
 ]
-
-// Fuseable = all except MYTHIC
 const FUSEABLE_RARITIES = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY']
 const RARITY_SORT_ORDER = ['MYTHIC', 'LEGENDARY', 'EPIC', 'RARE', 'UNCOMMON', 'COMMON']
 
-export default function FusionModal({ therians, onClose, onSuccess }: Props) {
+export default function FusionModal({ therians, inventory, onClose, onSuccess }: Props) {
   const [localTherians, setLocalTherians] = useState<TherianDTO[]>(therians)
-  const [slots, setSlots] = useState<(TherianDTO | null)[]>([null, null, null])
+  const [localInventory, setLocalInventory] = useState<InventoryItemDTO[]>(inventory)
+  const [slots, setSlots] = useState<FusionSlot[]>([null, null, null])
   const [phase, setPhase] = useState<Phase>('select')
   const [result, setResult] = useState<{ success: boolean; therian: TherianDTO; successRate: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showProbs, setShowProbs] = useState(false)
   const [hasFused, setHasFused] = useState(false)
 
-  // Derive selected rarity from first filled slot
+  // ─── Derived state ────────────────────────────────────────────────────────
   const selectedRarity = slots.find(s => s !== null)?.rarity ?? null
   const filledCount = slots.filter(Boolean).length
   const canFuse = filledCount === 3
 
-  // Selector: show fuseable therians, filter by selectedRarity if set, sort by rarity desc
+  // IDs of therians already in slots
+  const selectedTherianIds = slots.filter(s => s?.kind === 'therian').map(s => (s as TherianSlot).id)
+  // Count of each egg itemId used in slots
+  const usedEggCounts: Record<string, number> = {}
+  slots.filter(s => s?.kind === 'egg').forEach(s => {
+    const egg = s as EggSlot
+    usedEggCounts[egg.itemId] = (usedEggCounts[egg.itemId] ?? 0) + 1
+  })
+
+  // Selector therians
   const selectorTherians = localTherians
     .filter(t => {
       if (!FUSEABLE_RARITIES.includes(t.rarity)) return false
@@ -73,34 +95,113 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
       return true
     })
     .sort((a, b) => RARITY_SORT_ORDER.indexOf(a.rarity) - RARITY_SORT_ORDER.indexOf(b.rarity))
-  const selectedIds = slots.filter(Boolean).map(s => s!.id)
 
-  function addToSlot(therian: TherianDTO) {
-    if (selectedIds.includes(therian.id)) return
+  // Selector eggs: inventory eggs with qty > used
+  const selectorEggs: EggSlot[] = localInventory
+    .filter(item => {
+      if (item.type !== 'EGG') return false
+      if (!FUSEABLE_RARITIES.includes(item.rarity)) return false
+      if (selectedRarity && item.rarity !== selectedRarity) return false
+      const remaining = item.quantity - (usedEggCounts[item.itemId] ?? 0)
+      return remaining > 0
+    })
+    .sort((a, b) => RARITY_SORT_ORDER.indexOf(a.rarity) - RARITY_SORT_ORDER.indexOf(b.rarity))
+    .map(item => ({
+      kind: 'egg' as const,
+      itemId: item.itemId,
+      rarity: item.rarity,
+      name: item.name,
+      emoji: item.emoji,
+      availableQty: item.quantity - (usedEggCounts[item.itemId] ?? 0),
+    }))
+
+  const hasFuseableGroup = FUSEABLE_RARITIES.some(r => {
+    const therianCount = localTherians.filter(t => t.rarity === r).length
+    const eggCount = localInventory
+      .filter(i => i.type === 'EGG' && i.rarity === r)
+      .reduce((s, i) => s + i.quantity, 0)
+    return therianCount + eggCount >= 3
+  })
+
+  // ─── Auto-fill ────────────────────────────────────────────────────────────
+  function handleAutoFill() {
+    // Find highest fuseable rarity with 3+ items total (eggs + therians)
+    const bestRarity = [...FUSEABLE_RARITIES].reverse().find(r => {
+      const therianCount = localTherians.filter(t => t.rarity === r).length
+      const eggCount = localInventory
+        .filter(i => i.type === 'EGG' && i.rarity === r)
+        .reduce((s, i) => s + i.quantity, 0)
+      return therianCount + eggCount >= 3
+    })
+    if (!bestRarity) return
+
+    // Build egg pool for this rarity (track remaining qty)
+    const eggPool = localInventory
+      .filter(i => i.type === 'EGG' && i.rarity === bestRarity && i.quantity > 0)
+      .map(i => ({ itemId: i.itemId, rarity: i.rarity, name: i.name, emoji: i.emoji, remaining: i.quantity }))
+
+    const therianPool = localTherians.filter(t => t.rarity === bestRarity)
+
+    const newSlots: FusionSlot[] = []
+    let therianIdx = 0
+    for (let i = 0; i < 3; i++) {
+      // Prioritize eggs first
+      const egg = eggPool.find(e => e.remaining > 0)
+      if (egg) {
+        newSlots.push({ kind: 'egg', itemId: egg.itemId, rarity: egg.rarity, name: egg.name, emoji: egg.emoji, availableQty: egg.remaining })
+        egg.remaining--
+      } else if (therianIdx < therianPool.length) {
+        newSlots.push({ ...therianPool[therianIdx], kind: 'therian' })
+        therianIdx++
+      }
+    }
+    setSlots([...newSlots, ...Array(3 - newSlots.length).fill(null)])
+  }
+
+  // ─── Slot management ──────────────────────────────────────────────────────
+  function addTherian(t: TherianDTO) {
+    if (selectedTherianIds.includes(t.id)) return
     const nextEmpty = slots.findIndex(s => s === null)
     if (nextEmpty === -1) return
     const newSlots = [...slots]
-    newSlots[nextEmpty] = therian
+    newSlots[nextEmpty] = { ...t, kind: 'therian' }
+    setSlots(newSlots)
+  }
+
+  function addEgg(egg: EggSlot) {
+    const nextEmpty = slots.findIndex(s => s === null)
+    if (nextEmpty === -1) return
+    const newSlots = [...slots]
+    newSlots[nextEmpty] = egg
     setSlots(newSlots)
   }
 
   function removeFromSlot(index: number) {
     const newSlots = [...slots]
     newSlots[index] = null
-    // Compact: move nulls to end
-    const filled = newSlots.filter(Boolean) as TherianDTO[]
+    const filled = newSlots.filter(Boolean) as FusionSlot[]
     setSlots([...filled, ...Array(3 - filled.length).fill(null)])
   }
 
+  // ─── Fusion ───────────────────────────────────────────────────────────────
   async function handleFuse() {
     if (!canFuse) return
     setPhase('fusing')
     setError(null)
     try {
+      const therianIds = slots
+        .filter(s => s?.kind === 'therian')
+        .map(s => (s as TherianSlot).id)
+
+      const eggItems = slots.filter(s => s?.kind === 'egg') as EggSlot[]
+      const eggCountMap: Record<string, number> = {}
+      eggItems.forEach(e => { eggCountMap[e.itemId] = (eggCountMap[e.itemId] ?? 0) + 1 })
+      const eggUses = Object.entries(eggCountMap).map(([itemId, qty]) => ({ itemId, qty }))
+
       const res = await fetch('/api/therian/fuse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ therianIds: slots.map(s => s!.id) }),
+        body: JSON.stringify({ therianIds, eggUses }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -111,11 +212,14 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
       setResult({ success: data.success, therian: data.therian, successRate: data.successRate * 100 })
       setHasFused(true)
       setPhase('result')
-      // Refetch fresh therians list so the selector stays up to date
-      fetch('/api/therians/mine')
-        .then(r => r.ok ? r.json() : null)
-        .then(fresh => { if (fresh) setLocalTherians(fresh) })
-        .catch(() => {})
+      // Refresh both therians and inventory
+      Promise.all([
+        fetch('/api/therians/mine').then(r => r.ok ? r.json() : null),
+        fetch('/api/inventory').then(r => r.ok ? r.json() : null),
+      ]).then(([therianData, invData]) => {
+        if (therianData) setLocalTherians(therianData)
+        if (invData) setLocalInventory(invData.items)
+      }).catch(() => {})
     } catch {
       setError('Error de conexión.')
       setPhase('select')
@@ -128,10 +232,8 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
   }
 
   const rate = selectedRarity ? SUCCESS_RATE[selectedRarity] ?? 0 : null
-  const hasFuseableGroup = FUSEABLE_RARITIES.some(
-    r => localTherians.filter(t => t.rarity === r).length >= 3
-  )
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
@@ -148,7 +250,14 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
             <h2 className="text-white font-bold text-sm uppercase tracking-widest">Fusión de Therians</h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* Probabilities toggle */}
+            {phase === 'select' && hasFuseableGroup && (
+              <button
+                onClick={handleAutoFill}
+                className="flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all"
+              >
+                ✦ Auto-colocar
+              </button>
+            )}
             <button
               onClick={() => setShowProbs(p => !p)}
               className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all ${
@@ -156,7 +265,6 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
                   ? 'border-purple-500/50 bg-purple-500/15 text-purple-300'
                   : 'border-white/10 text-white/40 hover:text-white/70 hover:border-white/20'
               }`}
-              title="Ver probabilidades"
             >
               % prob
             </button>
@@ -192,20 +300,17 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
         {/* ─── SELECT PHASE ─── */}
         {phase === 'select' && (
           <>
-            {/* Instructions */}
             <div className="px-5 pt-3 pb-2 flex-shrink-0">
               <p className="text-[#8B84B0] text-xs leading-relaxed">
-                Coloca <span className="text-white font-semibold">3 Therians de la misma rareza</span> en los slots.
-                Los 3 se consumen independientemente del resultado.
+                Combina <span className="text-white font-semibold">3 elementos de la misma rareza</span> (Therians y/o Huevos).
+                Todo se consume independientemente del resultado.
               </p>
             </div>
 
-            {/* Main split layout */}
             <div className="flex flex-1 min-h-0 overflow-hidden">
 
               {/* LEFT: Slots + action */}
               <div className="w-[45%] flex flex-col px-4 py-3 gap-3 flex-shrink-0">
-                {/* 3 slots */}
                 {slots.map((slot, i) => (
                   <div
                     key={i}
@@ -217,14 +322,25 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
                     }`}
                   >
                     {slot ? (
-                      <>
-                        <TherianAvatar therian={slot} size={40} animated={false} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-xs font-semibold truncate leading-tight">{slot.name ?? slot.species.name}</p>
-                          <p className={`text-[10px] font-semibold ${RARITY_COLOR[slot.rarity]}`}>{RARITY_LABEL[slot.rarity]}</p>
-                        </div>
-                        <span className="text-white/20 text-xs flex-shrink-0">✕</span>
-                      </>
+                      slot.kind === 'egg' ? (
+                        <>
+                          <span className="text-3xl leading-none flex-shrink-0">{slot.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-xs font-semibold truncate leading-tight">{slot.name}</p>
+                            <p className={`text-[10px] font-semibold ${RARITY_COLOR[slot.rarity]}`}>{RARITY_LABEL[slot.rarity]}</p>
+                          </div>
+                          <span className="text-white/20 text-xs flex-shrink-0">✕</span>
+                        </>
+                      ) : (
+                        <>
+                          <TherianAvatar therian={slot} size={40} animated={false} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-xs font-semibold truncate leading-tight">{slot.name ?? slot.species.name}</p>
+                            <p className={`text-[10px] font-semibold ${RARITY_COLOR[slot.rarity]}`}>{RARITY_LABEL[slot.rarity]}</p>
+                          </div>
+                          <span className="text-white/20 text-xs flex-shrink-0">✕</span>
+                        </>
+                      )
                     ) : (
                       <div className="w-full flex flex-col items-center justify-center gap-1 py-1">
                         <span className="text-white/15 text-xl">+</span>
@@ -240,7 +356,7 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className={`font-semibold ${RARITY_COLOR[selectedRarity]}`}>{RARITY_LABEL[selectedRarity]}</span>
                       <span className="text-white/30">→</span>
-                      <span className={`font-semibold ${RARITY_COLOR[RARITY_NEXT_LABEL[selectedRarity] ? Object.entries(RARITY_LABEL).find(([,v]) => v === RARITY_NEXT_LABEL[selectedRarity])?.[0] ?? '' : '']}`}>
+                      <span className={`font-semibold ${RARITY_COLOR[Object.entries(RARITY_LABEL).find(([,v]) => v === RARITY_NEXT_LABEL[selectedRarity])?.[0] ?? '']}`}>
                         {RARITY_NEXT_LABEL[selectedRarity]}
                       </span>
                     </div>
@@ -248,10 +364,8 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
                   </div>
                 )}
 
-                {/* Error */}
                 {error && <p className="text-red-400 text-xs italic">{error}</p>}
 
-                {/* Fuse button */}
                 <button
                   onClick={handleFuse}
                   disabled={!canFuse}
@@ -268,48 +382,73 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
               {/* Divider */}
               <div className="border-l border-white/5 flex-shrink-0" />
 
-              {/* RIGHT: Therian selector */}
+              {/* RIGHT: Selector */}
               <div className="flex-1 flex flex-col min-h-0">
                 <p className="text-[#8B84B0] text-[10px] uppercase tracking-widest px-4 pt-3 pb-2 flex-shrink-0">
-                  {selectedRarity
-                    ? `Therians ${RARITY_LABEL[selectedRarity]}`
-                    : 'Seleccionar'}
+                  {selectedRarity ? `Therians ${RARITY_LABEL[selectedRarity]}` : 'Seleccionar'}
                 </p>
                 <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5">
-                  {selectorTherians.length === 0 ? (
+                  {selectorTherians.length === 0 && selectorEggs.length === 0 ? (
                     <div className="py-8 text-center text-[#4A4468] text-xs italic px-2">
                       {!hasFuseableGroup
-                        ? 'Necesitas al menos 3 Therians de la misma rareza para fusionar.'
+                        ? 'Necesitas al menos 3 elementos de la misma rareza (Therians + Huevos) para fusionar.'
                         : selectedRarity
-                        ? `No hay más Therians ${RARITY_LABEL[selectedRarity]} disponibles.`
-                        : 'Sin Therians disponibles.'
-                      }
+                        ? `No hay más ${RARITY_LABEL[selectedRarity]} disponibles.`
+                        : 'Sin elementos disponibles.'}
                     </div>
                   ) : (
-                    selectorTherians.map(t => {
-                      const isSelected = selectedIds.includes(t.id)
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => !isSelected && addToSlot(t)}
-                          disabled={isSelected}
-                          className={`w-full flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all ${
-                            isSelected
-                              ? `${RARITY_BORDER[t.rarity]} ${RARITY_BG[t.rarity]} opacity-35 cursor-not-allowed`
-                              : `${RARITY_BORDER[t.rarity]} ${RARITY_BG[t.rarity]} hover:opacity-80 cursor-pointer`
-                          }`}
-                        >
-                          <TherianAvatar therian={t} size={36} animated={false} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white text-xs font-semibold truncate leading-tight">{t.name ?? t.species.name}</p>
-                            <p className={`text-[10px] font-semibold ${RARITY_COLOR[t.rarity]}`}>{t.species.emoji} {t.species.name} · Nv {t.level}</p>
-                          </div>
-                          {isSelected && (
-                            <span className="text-[10px] text-white/30 flex-shrink-0">en slot</span>
+                    <>
+                      {/* Therians */}
+                      {selectorTherians.map(t => {
+                        const isSelected = selectedTherianIds.includes(t.id)
+                        return (
+                          <button
+                            key={t.id}
+                            onClick={() => !isSelected && addTherian(t)}
+                            disabled={isSelected}
+                            className={`w-full flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all ${
+                              isSelected
+                                ? `${RARITY_BORDER[t.rarity]} ${RARITY_BG[t.rarity]} opacity-35 cursor-not-allowed`
+                                : `${RARITY_BORDER[t.rarity]} ${RARITY_BG[t.rarity]} hover:opacity-80 cursor-pointer`
+                            }`}
+                          >
+                            <TherianAvatar therian={t} size={36} animated={false} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-xs font-semibold truncate leading-tight">{t.name ?? t.species.name}</p>
+                              <p className={`text-[10px] font-semibold ${RARITY_COLOR[t.rarity]}`}>{t.species.emoji} {t.species.name} · Nv {t.level}</p>
+                            </div>
+                            {isSelected && <span className="text-[10px] text-white/30 flex-shrink-0">en slot</span>}
+                          </button>
+                        )
+                      })}
+
+                      {/* Eggs divider */}
+                      {selectorEggs.length > 0 && (
+                        <>
+                          {selectorTherians.length > 0 && (
+                            <div className="flex items-center gap-2 py-1">
+                              <div className="flex-1 border-t border-white/5" />
+                              <span className="text-[10px] text-white/25 uppercase tracking-widest">Huevos</span>
+                              <div className="flex-1 border-t border-white/5" />
+                            </div>
                           )}
-                        </button>
-                      )
-                    })
+                          {selectorEggs.map(egg => (
+                            <button
+                              key={egg.itemId}
+                              onClick={() => addEgg(egg)}
+                              className={`w-full flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all ${RARITY_BORDER[egg.rarity]} ${RARITY_BG[egg.rarity]} hover:opacity-80 cursor-pointer`}
+                            >
+                              <span className="text-2xl leading-none flex-shrink-0">{egg.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white text-xs font-semibold truncate leading-tight">{egg.name}</p>
+                                <p className={`text-[10px] font-semibold ${RARITY_COLOR[egg.rarity]}`}>{RARITY_LABEL[egg.rarity]} · Huevo de fusión</p>
+                              </div>
+                              <span className="text-white/50 text-xs font-mono font-bold flex-shrink-0">×{egg.availableQty}</span>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -357,7 +496,7 @@ export default function FusionModal({ therians, onClose, onSuccess }: Props) {
                   <p className="text-white font-bold">{result.therian.name ?? result.therian.species.name}</p>
                   <p className="text-[#8B84B0] text-xs">{result.therian.species.emoji} {result.therian.species.name} · {result.therian.trait.name}</p>
                 </div>
-                <RarityBadge rarity={result.therian.rarity} size="sm" />
+                <RarityBadge rarity={result.therian.rarity as Rarity} size="sm" />
               </div>
               <div className="flex justify-center py-2">
                 <TherianAvatar therian={result.therian} size={140} animated />

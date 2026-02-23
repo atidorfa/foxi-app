@@ -1,23 +1,46 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { TherianDTO } from '@/lib/therian-dto'
+import type { InventoryItemDTO } from '@/app/api/inventory/route'
 import FusionModal from './FusionModal'
 
 export default function NavFusionButton() {
   const [showFusion, setShowFusion] = useState(false)
   const [therians, setTherians] = useState<TherianDTO[] | null>(null)
+  const [inventory, setInventory] = useState<InventoryItemDTO[] | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const handler = () => {
+      if (showFusion) {
+        fetch('/api/inventory')
+          .then(r => r.ok ? r.json() : { items: [] })
+          .then(data => setInventory(data.items))
+          .catch(() => setInventory([]))
+      } else {
+        setInventory(null) // invalidate cache
+      }
+    }
+    window.addEventListener('inventory-updated', handler)
+    return () => window.removeEventListener('inventory-updated', handler)
+  }, [showFusion])
 
   const openFusion = () => {
     setShowFusion(true)
-    if (!therians) {
+    if (!therians || !inventory) {
       setLoading(true)
-      fetch('/api/therians/mine')
-        .then(r => r.ok ? r.json() : [])
-        .then(data => { setTherians(data); setLoading(false) })
-        .catch(() => { setTherians([]); setLoading(false) })
+      Promise.all([
+        fetch('/api/therians/mine').then(r => r.ok ? r.json() : []),
+        fetch('/api/inventory').then(r => r.ok ? r.json() : { items: [] }),
+      ])
+        .then(([therianData, invData]) => {
+          setTherians(therianData)
+          setInventory(invData.items ?? [])
+          setLoading(false)
+        })
+        .catch(() => { setTherians([]); setInventory([]); setLoading(false) })
     }
   }
 
@@ -31,7 +54,7 @@ export default function NavFusionButton() {
       </button>
 
       {showFusion && (
-        loading || !therians ? createPortal(
+        loading || !therians || !inventory ? createPortal(
           <div
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
             onClick={() => setShowFusion(false)}
@@ -42,10 +65,12 @@ export default function NavFusionButton() {
         ) : (
           <FusionModal
             therians={therians}
+            inventory={inventory}
             onClose={() => setShowFusion(false)}
             onSuccess={() => {
               setShowFusion(false)
               setTherians(null)
+              setInventory(null)
               window.location.href = '/therian'
             }}
           />

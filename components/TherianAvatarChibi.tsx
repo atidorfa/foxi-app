@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react'
 import type { TherianDTO } from '@/lib/therian-dto'
+import { ACC_VISUAL_CHIBI } from '@/lib/items/accessory-visuals'
 
 interface Props {
   therian: TherianDTO
@@ -139,6 +140,21 @@ export default function TherianAvatarChibi({
   const isGradient = appearance.pattern === 'gradient'
   const fill = isGradient ? 'url(#bodyGrad)' : primary
 
+  // Accessory overlays
+  const acc = therian.equippedAccessories ?? {}
+  function accTypeId(slotId: string): string | null {
+    const inst = acc[slotId]
+    if (!inst) return null
+    return inst.includes(':') ? inst.split(':')[0] : inst
+  }
+  const earsId  = accTypeId('orejas')
+  const tailId  = accTypeId('cola')
+  const eyesId  = accTypeId('ojos')
+  const clawsId = accTypeId('garras')
+  const glassId = accTypeId('anteojos')
+  const headId  = accTypeId('cabeza')
+  const colors  = { primary, secondary, accent }
+
   const lArmRef    = useRef<SVGGElement>(null)
   const rArmRef    = useRef<SVGGElement>(null)
   const lLegRef    = useRef<SVGGElement>(null)
@@ -255,6 +271,9 @@ export default function TherianAvatarChibi({
           <ellipse cx="166" cy="261" rx="17" ry="9" fill={secondary} opacity="0.88"/>
         </g>
 
+        {/* Cola accesorio (detrás del cuerpo, antes del signature) */}
+        {tailId && ACC_VISUAL_CHIBI[tailId]?.(colors)}
+
         {/* Signature trait (behind body) */}
         {SignatureEl(primary, accent)}
 
@@ -264,12 +283,21 @@ export default function TherianAvatarChibi({
         {/* Pattern over body */}
         {PatternEl(primary, secondary)}
 
-        {/* ── Ears — tall, behind head ── */}
-        <path d={EAR_L} fill={fill} stroke={accent} strokeWidth="1"/>
-        <path d={EAR_R} fill={fill} stroke={accent} strokeWidth="1"/>
-        {/* Inner ear */}
-        <path d="M82,92 Q64,20 104,4 Q136,48 110,96 Z" fill={secondary} opacity="0.55"/>
-        <path d="M218,92 Q236,20 196,4 Q164,48 190,96 Z" fill={secondary} opacity="0.55"/>
+        {/* Garras (sobre patas) */}
+        {clawsId && ACC_VISUAL_CHIBI[clawsId]?.(colors)}
+
+        {/* ── Ears — accesorio reemplaza las genéricas ── */}
+        {earsId
+          ? ACC_VISUAL_CHIBI[earsId]?.(colors)
+          : (
+            <>
+              <path d={EAR_L} fill={fill} stroke={accent} strokeWidth="1"/>
+              <path d={EAR_R} fill={fill} stroke={accent} strokeWidth="1"/>
+              <path d="M82,92 Q64,20 104,4 Q136,48 110,96 Z" fill={secondary} opacity="0.55"/>
+              <path d="M218,92 Q236,20 196,4 Q164,48 190,96 Z" fill={secondary} opacity="0.55"/>
+            </>
+          )
+        }
 
         {/* ── Head — large round oval, defining chibi shape ── */}
         <ellipse cx="150" cy="100" rx="82" ry="76" fill={fill}/>
@@ -288,6 +316,15 @@ export default function TherianAvatarChibi({
                 filter={therian.rarity === 'LEGENDARY' ? 'url(#legendary-glow)' : undefined}/>
           <circle cx="0" cy="0" r="2.5" fill="white" opacity="0.85"/>
         </g>
+
+        {/* Ojos accesorio (markings sobre ojos) */}
+        {eyesId && ACC_VISUAL_CHIBI[eyesId]?.(colors)}
+
+        {/* Anteojos */}
+        {glassId && ACC_VISUAL_CHIBI[glassId]?.(colors)}
+
+        {/* Cabeza accesorio (corona, etc.) */}
+        {headId && ACC_VISUAL_CHIBI[headId]?.(colors)}
 
         {/* Rarity aura */}
         {therian.rarity === 'LEGENDARY' && (

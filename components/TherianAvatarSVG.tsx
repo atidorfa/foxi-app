@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react'
 import type { TherianDTO } from '@/lib/therian-dto'
+import { ACC_VISUAL_SVG } from '@/lib/items/accessory-visuals'
 
 interface Props {
   therian: TherianDTO
@@ -128,6 +129,21 @@ export default function TherianAvatarSVG({
 
   const isGradient = appearance.pattern === 'gradient'
   const fill = isGradient ? 'url(#bodyGrad)' : primary
+
+  // Accessory overlays
+  const acc = therian.equippedAccessories ?? {}
+  function accTypeId(slotId: string): string | null {
+    const inst = acc[slotId]
+    if (!inst) return null
+    return inst.includes(':') ? inst.split(':')[0] : inst
+  }
+  const earsId  = accTypeId('orejas')
+  const tailId  = accTypeId('cola')
+  const eyesId  = accTypeId('ojos')
+  const clawsId = accTypeId('garras')
+  const glassId = accTypeId('anteojos')
+  const headId  = accTypeId('cabeza')
+  const colors  = { primary, secondary, accent }
 
   // Refs para las extremidades — el RAF actualiza los atributos directamente
   const lArmRef = useRef<SVGGElement>(null)
@@ -267,6 +283,9 @@ export default function TherianAvatarSVG({
           </>
         )}
 
+        {/* Cola accesorio (detrás del cuerpo, antes del signature) */}
+        {tailId && ACC_VISUAL_SVG[tailId]?.(colors)}
+
         {/* Signature (detrás del cuerpo) */}
         {SignatureEl(primary, accent)}
 
@@ -276,11 +295,21 @@ export default function TherianAvatarSVG({
         {/* Patrón sobre cuerpo */}
         {PatternEl(primary, secondary)}
 
-        {/* Orejas */}
-        <path d={EAR_L} fill={primary} stroke={accent} strokeWidth="1"/>
-        <path d={EAR_R} fill={primary} stroke={accent} strokeWidth="1"/>
-        <path d="M110 76 Q103 50 118 42 Q125 58 116 79 Z" fill={secondary} opacity="0.6"/>
-        <path d="M190 76 Q197 50 182 42 Q175 58 184 79 Z" fill={secondary} opacity="0.6"/>
+        {/* Garras (sobre patas) */}
+        {showLimbs && clawsId && ACC_VISUAL_SVG[clawsId]?.(colors)}
+
+        {/* Orejas — accesorio reemplaza las genéricas */}
+        {earsId
+          ? ACC_VISUAL_SVG[earsId]?.(colors)
+          : (
+            <>
+              <path d={EAR_L} fill={primary} stroke={accent} strokeWidth="1"/>
+              <path d={EAR_R} fill={primary} stroke={accent} strokeWidth="1"/>
+              <path d="M110 76 Q103 50 118 42 Q125 58 116 79 Z" fill={secondary} opacity="0.6"/>
+              <path d="M190 76 Q197 50 182 42 Q175 58 184 79 Z" fill={secondary} opacity="0.6"/>
+            </>
+          )
+        }
 
         {/* Cabeza */}
         <path d={HEAD_SHAPE} fill={fill}/>
@@ -299,6 +328,15 @@ export default function TherianAvatarSVG({
                 filter={therian.rarity === 'LEGENDARY' ? 'url(#legendary-glow)' : undefined}/>
           <circle cx="0" cy="0" r="2" fill="white" opacity="0.8"/>
         </g>
+
+        {/* Ojos accesorio (markings sobre ojos) */}
+        {eyesId && ACC_VISUAL_SVG[eyesId]?.(colors)}
+
+        {/* Anteojos */}
+        {glassId && ACC_VISUAL_SVG[glassId]?.(colors)}
+
+        {/* Cabeza accesorio (corona, etc.) */}
+        {headId && ACC_VISUAL_SVG[headId]?.(colors)}
 
         {/* Efecto rareza */}
         {therian.rarity === 'LEGENDARY' && (

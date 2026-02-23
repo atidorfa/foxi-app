@@ -21,6 +21,7 @@ model User {
   therianSlots       Int                 @default(1)
   therians           Therian[]
   verificationTokens VerificationToken[]
+  inventoryItems     InventoryItem[]
 }
 
 model VerificationToken {
@@ -91,4 +92,16 @@ model ActionLog {
   delta      String   @db.Text
   narrative  String   @db.Text
   createdAt  DateTime @default(now())
+}
+
+model InventoryItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // EGG | ACCESSORY | UPGRADE
+  itemId    String   // egg_common | egg_uncommon | etc.
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, itemId])
 }
