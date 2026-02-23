@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     // Award GOLD to challenger
     await tx.user.update({
       where: { id: session.user.id },
-      data: { essencia: { increment: challengerWon ? GOLD_WIN : GOLD_LOSE } },
+      data: { gold: { increment: challengerWon ? GOLD_WIN : GOLD_LOSE } },
     })
 
     return [uc, ut]

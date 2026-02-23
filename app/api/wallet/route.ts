@@ -10,7 +10,7 @@ export async function GET() {
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { essencia: true, therianCoin: true, therianSlots: true },
+    select: { gold: true, essence: true, therianSlots: true },
   })
 
   if (!user) {
@@ -18,8 +18,8 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    essencia: user.essencia,
-    therianCoin: user.therianCoin,
+    gold: user.gold,
+    essence: user.essence,
     therianSlots: user.therianSlots,
   })
 }

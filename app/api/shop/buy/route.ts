@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, essencia: true, therianCoin: true, therianSlots: true },
+    select: { id: true, gold: true, essence: true, therianSlots: true },
   })
 
   if (!user) {
@@ -38,15 +38,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Validar saldo
-  if (item.costEssencia > 0 && user.essencia < item.costEssencia) {
+  if (item.costGold > 0 && user.gold < item.costGold) {
     return NextResponse.json(
-      { error: 'INSUFFICIENT_ESSENCIA', available: user.essencia, required: item.costEssencia },
+      { error: 'INSUFFICIENT_ESSENCIA', available: user.gold, required: item.costGold },
       { status: 400 }
     )
   }
-  if (item.costCoin > 0 && user.therianCoin < item.costCoin) {
+  if (item.costCoin > 0 && user.essence < item.costCoin) {
     return NextResponse.json(
-      { error: 'INSUFFICIENT_COIN', available: user.therianCoin, required: item.costCoin },
+      { error: 'INSUFFICIENT_COIN', available: user.essence, required: item.costCoin },
       { status: 400 }
     )
   }
@@ -111,17 +111,17 @@ export async function POST(req: NextRequest) {
   const updatedUser = await db.user.update({
     where: { id: session.user.id },
     data: {
-      ...(item.costEssencia > 0 ? { essencia: { decrement: item.costEssencia } } : {}),
-      ...(item.costCoin > 0 ? { therianCoin: { decrement: item.costCoin } } : {}),
+      ...(item.costGold > 0 ? { gold: { decrement: item.costGold } } : {}),
+      ...(item.costCoin > 0 ? { essence: { decrement: item.costCoin } } : {}),
     },
-    select: { essencia: true, therianCoin: true, therianSlots: true },
+    select: { gold: true, essence: true, therianSlots: true },
   })
 
   return NextResponse.json({
     success: true,
     newBalance: {
-      essencia: updatedUser.essencia,
-      therianCoin: updatedUser.therianCoin,
+      gold: updatedUser.gold,
+      essence: updatedUser.essence,
       therianSlots: updatedUser.therianSlots,
     },
     ...(updatedTherian ? { updatedTherian } : {}),

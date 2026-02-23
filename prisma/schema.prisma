@@ -16,8 +16,8 @@ model User {
   name               String?
   emailVerified      DateTime?
   createdAt          DateTime            @default(now())
-  essencia           Int                 @default(0)
-  therianCoin        Int                 @default(0)
+  gold               Int                 @default(0)
+  essence            Int                 @default(0)
   therianSlots       Int                 @default(1)
   therians           Therian[]
   verificationTokens VerificationToken[]

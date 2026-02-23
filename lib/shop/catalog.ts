@@ -5,7 +5,7 @@ export interface ShopItem {
   name: string
   emoji: string
   description: string
-  costEssencia: number
+  costGold: number
   costCoin: number
   type: ShopItemType
   accessoryId?: string
@@ -17,7 +17,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Cambio de nombre',
     emoji: '✏️',
     description: 'Elige un nuevo nombre único para tu Therian.',
-    costEssencia: 500,
+    costGold: 500,
     costCoin: 0,
     type: 'service',
   },
@@ -26,7 +26,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Anteojos',
     emoji: '🕶️',
     description: 'Añade unos anteojos retro a tu Therian.',
-    costEssencia: 300,
+    costGold: 300,
     costCoin: 0,
     type: 'cosmetic',
     accessoryId: 'glasses',
@@ -36,7 +36,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Corona',
     emoji: '👑',
     description: 'Una corona digna de la realeza Therian.',
-    costEssencia: 0,
+    costGold: 0,
     costCoin: 3,
     type: 'cosmetic',
     accessoryId: 'crown',
@@ -46,7 +46,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Slot Extra de Therian',
     emoji: '🌟',
     description: 'Desbloquea un segundo Therian para adoptar.',
-    costEssencia: 0,
+    costGold: 0,
     costCoin: 5,
     type: 'slot',
   },

@@ -249,8 +249,8 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
       setNarrative(data.narrative)
       setLastDelta(data.delta)
       if (data.levelUp) setLevelUp(true)
-      if (data.essenciaEarned) {
-        setGoldEarned(data.essenciaEarned)
+      if (data.goldEarned) {
+        setGoldEarned(data.goldEarned)
         window.dispatchEvent(new CustomEvent('wallet-update'))
       }
       window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.therian }))

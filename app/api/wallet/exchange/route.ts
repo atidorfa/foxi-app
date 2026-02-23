@@ -27,16 +27,16 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { essencia: true, therianCoin: true },
+    select: { gold: true, essence: true },
   })
 
   if (!user) {
     return NextResponse.json({ error: 'USER_NOT_FOUND' }, { status: 404 })
   }
 
-  if (user.essencia < body.amount) {
+  if (user.gold < body.amount) {
     return NextResponse.json(
-      { error: 'INSUFFICIENT_ESSENCIA', available: user.essencia },
+      { error: 'INSUFFICIENT_ESSENCIA', available: user.gold },
       { status: 400 }
     )
   }
@@ -46,15 +46,15 @@ export async function POST(req: NextRequest) {
   const updated = await db.user.update({
     where: { id: session.user.id },
     data: {
-      essencia: { decrement: body.amount },
-      therianCoin: { increment: coinsToAdd },
+      gold: { decrement: body.amount },
+      essence: { increment: coinsToAdd },
     },
-    select: { essencia: true, therianCoin: true },
+    select: { gold: true, essence: true },
   })
 
   return NextResponse.json({
-    essencia: updated.essencia,
-    therianCoin: updated.therianCoin,
-    exchanged: { essencia: body.amount, coinReceived: coinsToAdd },
+    gold: updated.gold,
+    essence: updated.essence,
+    exchanged: { gold: body.amount, coinReceived: coinsToAdd },
   })
 }

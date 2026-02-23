@@ -6,8 +6,8 @@ import type { TherianDTO } from '@/lib/therian-dto'
 import ShopModal from './ShopModal'
 
 interface Wallet {
-  essencia: number
-  therianCoin: number
+  gold: number
+  essence: number
   therianSlots: number
 }
 
