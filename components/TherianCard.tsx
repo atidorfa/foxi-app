@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { TherianDTO } from '@/lib/therian-dto'
 import type { BattleResult } from '@/lib/battle/engine'
@@ -27,13 +28,22 @@ const STAT_CONFIG = [
   { key: 'charisma' as const, label: 'Carisma',   icon: '✨', color: 'charisma' },
 ]
 
-function timeRemaining(isoString: string | null): string {
+function countdown(isoString: string | null): string {
   if (!isoString) return 'Ya disponible'
   const diff = new Date(isoString).getTime() - Date.now()
   if (diff <= 0) return 'Ya disponible'
-  const h = Math.floor(diff / 3_600_000)
-  const m = Math.floor((diff % 3_600_000) / 60_000)
-  return h > 0 ? `${h}h ${m}m` : `${m}m`
+  const totalSec = Math.ceil(diff / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s).padStart(2, '0')
+  return h > 0 ? `${h}h ${mm}:${ss}` : `${mm}:${ss}`
+}
+
+function availableAt(isoString: string | null): string {
+  if (!isoString) return 'Ya disponible'
+  return new Date(isoString).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 
 const RARITY_GLOW: Record<string, string> = {
@@ -46,6 +56,7 @@ const RARITY_GLOW: Record<string, string> = {
 }
 
 export default function TherianCard({ therian: initialTherian, rank }: Props) {
+  const router = useRouter()
   const [therian, setTherian] = useState(initialTherian)
 
   // Sync prop changes from parent (e.g. equipping a rune)
@@ -54,8 +65,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   }, [initialTherian])
   const [narrative, setNarrative] = useState<string | null>(null)
   const [lastDelta, setLastDelta] = useState<{ stat: string; amount: number } | null>(null)
-  const [levelUp, setLevelUp] = useState(false)
-  const [showEvolution, setShowEvolution] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [goldEarned, setGoldEarned] = useState<number | null>(null)
   const [showActionPopup, setShowActionPopup] = useState(false)
@@ -88,6 +97,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const [biting, setBiting] = useState(false)
   const [biteError, setBiteError] = useState<string | null>(null)
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null)
+  const [biteXpEarned, setBiteXpEarned] = useState<number>(0)
 
   // Escuchar compras desde NavShopButton
   useEffect(() => {
@@ -98,6 +108,46 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
     window.addEventListener('therian-updated', handler)
     return () => window.removeEventListener('therian-updated', handler)
   }, [])
+
+  // Tick each second to keep countdown displays current
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const hasCooldown = (!therian.canAct && therian.nextActionAt) || (!therian.canBite && therian.nextBiteAt)
+    if (hasCooldown) {
+      const interval = setInterval(() => setTick(t => t + 1), 1000)
+      return () => clearInterval(interval)
+    }
+  }, [therian.canAct, therian.nextActionAt, therian.canBite, therian.nextBiteAt])
+
+  // Auto-unlock templar when cooldown expires
+  useEffect(() => {
+    if (!therian.canAct && !therian.actionsMaxed && therian.nextActionAt) {
+      const msLeft = new Date(therian.nextActionAt).getTime() - Date.now()
+      if (msLeft <= 0) {
+        setTherian(prev => ({ ...prev, canAct: true, nextActionAt: null }))
+        return
+      }
+      const timer = setTimeout(() => {
+        setTherian(prev => ({ ...prev, canAct: true, nextActionAt: null }))
+      }, msLeft)
+      return () => clearTimeout(timer)
+    }
+  }, [therian.canAct, therian.actionsMaxed, therian.nextActionAt])
+
+  // Auto-unlock morder when cooldown expires
+  useEffect(() => {
+    if (!therian.canBite && therian.nextBiteAt) {
+      const msLeft = new Date(therian.nextBiteAt).getTime() - Date.now()
+      if (msLeft <= 0) {
+        setTherian(prev => ({ ...prev, canBite: true, nextBiteAt: null }))
+        return
+      }
+      const timer = setTimeout(() => {
+        setTherian(prev => ({ ...prev, canBite: true, nextBiteAt: null }))
+      }, msLeft)
+      return () => clearTimeout(timer)
+    }
+  }, [therian.canBite, therian.nextBiteAt])
 
   // Re-fetch accessories when inventory changes (e.g. after a purchase)
   useEffect(() => {
@@ -171,15 +221,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   useEffect(() => {
     if (editingName) nameInputRef.current?.focus()
   }, [editingName])
-
-  // Trigger evolution overlay when therian transitions to level 2
-  useEffect(() => {
-    if (levelUp && therian.level === 2) {
-      setShowEvolution(true)
-      const t = setTimeout(() => setShowEvolution(false), 4000)
-      return () => clearTimeout(t)
-    }
-  }, [levelUp, therian.level])
 
   const handleNameSave = async () => {
     const trimmed = nameInput.trim()
@@ -279,7 +320,9 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
         setGoldEarned(data.goldEarned)
         window.dispatchEvent(new CustomEvent('wallet-update'))
       }
+      setBiteXpEarned(data.xpEarned ?? 0)
       window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.challenger }))
+      router.refresh()
     } catch {
       setBiteError('Error de conexión.')
       setBiting(false)
@@ -293,6 +336,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
     setBiteError(null)
     setTargetTherian(null)
     setBattleResult(null)
+    setBiteXpEarned(0)
   }
 
   const handleBiteClose = () => {
@@ -359,7 +403,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
     setError(null)
     setNarrative(null)
     setLastDelta(null)
-    setLevelUp(false)
 
     try {
       const res = await fetch('/api/therian/action', {
@@ -383,12 +426,13 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
       setTherian(data.therian)
       setNarrative(data.narrative)
       setLastDelta(data.delta)
-      if (data.levelUp) setLevelUp(true)
       if (data.goldEarned) {
         setGoldEarned(data.goldEarned)
         window.dispatchEvent(new CustomEvent('wallet-update'))
       }
       window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.therian }))
+      // Refresh server components (UserCard) to show updated level/xp
+      router.refresh()
     } catch {
       setError('Error de conexión.')
     }
@@ -421,7 +465,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
     return id ? (RUNES.find(r => r.id === id) ?? null) : null
   })
 
-  const xpPct = Math.min(100, (therian.xp / therian.xpToNext) * 100)
   const glowClass = RARITY_GLOW[therian.rarity] ?? RARITY_GLOW.COMMON
 
   return (
@@ -600,7 +643,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               </button>
             )}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-              <p className="text-[#8B84B0] text-xs">🔰 Nivel {therian.level}</p>
               <p className="text-[#8B84B0] text-xs">🦷 {therian.bites} mordidas</p>
               {rank !== undefined && (
                 <p className="text-[#8B84B0] text-xs">🏆 #{rank}</p>
@@ -626,13 +668,11 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               className="group rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 transition-colors"
             >
               <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">⚔️ Morder</p>
-              <p className="text-white/50 text-xs leading-none group-hover:hidden">
-                {therian.nextBiteAt
-                  ? new Date(therian.nextBiteAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-                  : 'mañana'}
+              <p className="text-white/50 text-xs leading-none group-hover:hidden font-mono">
+                {therian.nextBiteAt ? countdown(therian.nextBiteAt) : 'mañana'}
               </p>
               <p className="text-white/70 text-xs leading-none hidden group-hover:block">
-                {therian.nextBiteAt ? `Faltan ${timeRemaining(therian.nextBiteAt)}` : 'mañana'}
+                {therian.nextBiteAt ? availableAt(therian.nextBiteAt) : 'mañana'}
               </p>
             </button>
           )}
@@ -665,6 +705,19 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                 })}
               </div>
             </button>
+          ) : !therian.canAct ? (
+            <button
+              onClick={() => setShowActionPopup(true)}
+              className="group rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 transition-colors"
+            >
+              <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">🌿 Templar</p>
+              <p className="text-white/50 text-xs leading-none group-hover:hidden font-mono">
+                {therian.nextActionAt ? countdown(therian.nextActionAt) : 'espera'}
+              </p>
+              <p className="text-white/70 text-xs leading-none hidden group-hover:block">
+                {therian.nextActionAt ? availableAt(therian.nextActionAt) : 'espera'}
+              </p>
+            </button>
           ) : (
             <button
               onClick={() => setShowActionPopup(true)}
@@ -695,21 +748,14 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
             </button>
           )}
 
-          {/* Col 1 fila 2: Jaula — mismo tamaño que Morder, exactamente debajo */}
-          {therian.level >= 2 ? (
-            <Link
-              href="/casa"
-              className="rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-center hover:bg-amber-500/15 hover:border-amber-500/50 transition-colors"
-            >
-              <p className="text-amber-400 text-xs font-semibold leading-none mb-0.5">🏠 Jaula</p>
-              <p className="text-amber-400/70 text-xs leading-none">Entrar</p>
-            </Link>
-          ) : (
-            <div className="rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center opacity-50 cursor-not-allowed">
-              <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">🏠 Jaula</p>
-              <p className="text-white/30 text-xs leading-none">Nivel 2</p>
-            </div>
-          )}
+          {/* Col 1 fila 2: Jaula */}
+          <Link
+            href="/casa"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-center hover:bg-amber-500/15 hover:border-amber-500/50 transition-colors"
+          >
+            <p className="text-amber-400 text-xs font-semibold leading-none mb-0.5">🏠 Jaula</p>
+            <p className="text-amber-400/70 text-xs leading-none">Entrar</p>
+          </Link>
 
           {/* Col 2 fila 2: Capsular */}
           <button
@@ -740,18 +786,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               delta={lastDelta?.stat === cfg.key ? lastDelta.amount : undefined}
             />
           ))}
-          <div className="pt-2 space-y-1">
-            <div className="flex justify-between text-xs text-[#8B84B0]">
-              <span>XP</span>
-              <span className="font-mono">{therian.xp} / {therian.xpToNext}</span>
-            </div>
-            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full transition-all duration-1000"
-                style={{ width: `${xpPct}%` }}
-              />
-            </div>
-          </div>
         </div>
 
         {/* Trait */}
@@ -803,42 +837,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
       </div>
       </div>
 
-      {/* Evolution overlay — aparece cuando el Therian pasa a nivel 2 */}
-      {showEvolution && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85">
-          <div className="relative flex items-center justify-center">
-            {/* Anillos de ping concéntricos */}
-            <span className="absolute inline-flex h-64 w-64 rounded-full bg-amber-400 opacity-20 animate-ping" />
-            <span
-              className="absolute inline-flex h-48 w-48 rounded-full bg-amber-400 opacity-15 animate-ping"
-              style={{ animationDelay: '0.3s' }}
-            />
-            <span
-              className="absolute inline-flex h-32 w-32 rounded-full bg-amber-400 opacity-10 animate-ping"
-              style={{ animationDelay: '0.6s' }}
-            />
-            {/* Avatar centrado */}
-            <div className="relative z-10">
-              <TherianAvatar therian={therian} size={240} animated />
-            </div>
-          </div>
-          <div className="mt-10 text-center">
-            <p
-              className="text-5xl font-bold text-amber-400 tracking-widest uppercase"
-              style={{ textShadow: '0 0 20px rgba(252,211,77,0.9), 0 0 60px rgba(252,211,77,0.4)' }}
-            >
-              ¡EVOLUCIÓN!
-            </p>
-            <p className="text-amber-300/70 text-sm mt-3">
-              Tu Therian ha alcanzado el nivel 2 y ha ganado extremidades
-            </p>
-            <p className="text-amber-300/40 text-xs mt-1">
-              La Jaula ya está disponible
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Bite popup */}
       {showBitePopup && (
         <div
@@ -863,7 +861,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
             {/* Cooldown banner */}
             {!therian.canBite && therian.nextBiteAt && (
               <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 text-yellow-300 text-sm text-center">
-                ⏳ Próxima mordida en {timeRemaining(therian.nextBiteAt)}
+                ⏳ Próxima mordida en <span className="font-mono">{countdown(therian.nextBiteAt)}</span>
               </div>
             )}
 
@@ -908,7 +906,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-white font-bold">{target.name}</div>
-                    <div className="text-[#8B84B0] text-sm">Nv {target.level}</div>
                   </div>
                   <div className="text-right">
                     <div className={`text-sm font-semibold ${
@@ -945,6 +942,12 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                     )
                   })}
                 </div>
+                <div className="flex items-center justify-center gap-3 rounded-lg bg-white/4 py-2 text-xs">
+                  <span className="text-amber-400 font-mono font-semibold">🪙 +10 Oro</span>
+                  <span className="text-white/20">·</span>
+                  <span className="text-purple-400 font-mono font-semibold">✨ +10 XP</span>
+                  <span className="text-white/30 text-[10px]">si ganás</span>
+                </div>
                 {target.id === therian.id && (
                   <p className="text-amber-400 text-xs text-center">No puedes morderte a ti mismo.</p>
                 )}
@@ -979,9 +982,14 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
 
             {/* Result actions */}
             {bitePhase === 'result' && goldEarned !== null && (
-              <div className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2 text-amber-400 text-sm font-semibold">
-                <span>🪙</span>
-                <span>+{goldEarned} GOLD</span>
+              <div className="flex items-center justify-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2 text-sm font-semibold">
+                <span className="text-amber-400">🪙 +{goldEarned} Oro</span>
+                {biteXpEarned > 0 && (
+                  <>
+                    <span className="text-white/20">·</span>
+                    <span className="text-purple-400">✨ +{biteXpEarned} XP</span>
+                  </>
+                )}
               </div>
             )}
 
@@ -1159,6 +1167,12 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               </button>
             </div>
 
+            {!therian.canAct && therian.nextActionAt && (
+              <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 text-yellow-300 text-sm text-center">
+                ⏳ Próximo temple en <span className="font-mono">{countdown(therian.nextActionAt)}</span>
+              </div>
+            )}
+
             <DailyActionButtons therian={therian} onAction={handleAction} />
 
             {narrative && <FlavorText text={narrative} key={narrative} />}
@@ -1173,12 +1187,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
             {error && (
               <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-red-300 text-sm text-center italic">
                 {error}
-              </div>
-            )}
-
-            {levelUp && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-amber-300 text-sm text-center">
-                ✦ ¡Tu Therian alcanzó el nivel {therian.level}! ✦
               </div>
             )}
 
