@@ -27,16 +27,17 @@ function parseEquippedAccessories(raw: string | null): Record<string, string> {
   }
 }
 
-const COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24 horas
+const COOLDOWN_MS = 5 * 60 * 1000 // 5 minutos (mordida)
+const ACTION_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutos (templar)
 
-function xpToNextLevel(level: number): number {
+export function xpToNextLevel(level: number): number {
   return Math.floor(100 * Math.pow(1.5, level - 1))
 }
 
 export function toTherianDTO(therian: Therian) {
   const baseStats: TherianStats = JSON.parse(therian.stats)
   
-  const equippedRunesIds: string[] = JSON.parse(therian.equippedRunes || '[]')
+  const equippedRunesIds: string[] = JSON.parse((therian as any).equippedRunes || '[]')
   const equippedRunes = equippedRunesIds.map(id => getRuneById(id)!).filter(Boolean)
 
   const stats = { ...baseStats }
@@ -54,11 +55,19 @@ export function toTherianDTO(therian: Therian) {
 
   const actionsUsed = (therian as any).actionsUsed ?? 0
   const actionsMaxed = actionsUsed >= MAX_ACTIONS
-  const canAct = !actionsMaxed
   const actionGains: Record<string, number> = JSON.parse((therian as any).actionGains || '{}')
 
   const now = Date.now()
   const lastActionAt = therian.lastActionAt
+
+  const actionCooldownExpiry = lastActionAt
+    ? new Date(lastActionAt).getTime() + ACTION_COOLDOWN_MS
+    : 0
+  const actionInCooldown = now < actionCooldownExpiry
+  const canAct = !actionsMaxed && !actionInCooldown
+  const nextActionAt = actionInCooldown
+    ? new Date(actionCooldownExpiry).toISOString()
+    : null
 
   const lastBiteAt = therian.lastBiteAt
   const canBite = !lastBiteAt || (now - new Date(lastBiteAt).getTime() > COOLDOWN_MS)
@@ -90,12 +99,9 @@ export function toTherianDTO(therian: Therian) {
     baseStats,
     equippedRunes,
     equippedRunesIds,
-    level: therian.level,
-    xp: therian.xp,
-    xpToNext: xpToNextLevel(therian.level),
     lastActionAt: lastActionAt ? lastActionAt.toISOString() : null,
     canAct,
-    nextActionAt: null,
+    nextActionAt,
     actionsUsed,
     actionsMaxed,
     actionGains,

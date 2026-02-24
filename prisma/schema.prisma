@@ -19,6 +19,12 @@ model User {
   gold               Int                 @default(0)
   essence            Int                 @default(0)
   therianSlots       Int                 @default(1)
+  level              Int                 @default(1)
+  xp                 Int                 @default(0)
+  claimedAchievements String             @default("[]") @db.Text
+  loginStreak         Int                @default(0)
+  lastLoginDate       String             @default("") @db.Text
+  claimedMissions     String             @default("[]") @db.Text
   therians           Therian[]
   verificationTokens VerificationToken[]
   inventoryItems     InventoryItem[]
@@ -43,8 +49,6 @@ model Therian {
   appearance   String   @db.Text
   stats        String   @db.Text
   traitId      String
-  level        Int         @default(1)
-  xp           Int         @default(0)
   lastActionAt DateTime?
   actionsUsed  Int         @default(0)
   actionGains  String      @default("{}") @db.Text

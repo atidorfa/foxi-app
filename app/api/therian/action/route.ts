@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
-import { toTherianDTO } from '@/lib/therian-dto'
+import { toTherianDTO, xpToNextLevel } from '@/lib/therian-dto'
 import { getNarrative, ACTION_DELTAS, MAX_ACTIONS } from '@/lib/actions/narratives'
 import type { ActionType } from '@/lib/actions/narratives'
 import type { TherianStats } from '@/lib/generation/engine'
@@ -11,10 +11,6 @@ const schema = z.object({
   action_type: z.enum(['CARE', 'TRAIN', 'EXPLORE', 'SOCIAL']),
   therianId:   z.string(),
 })
-
-function xpToNextLevel(level: number): number {
-  return Math.floor(100 * Math.pow(1.5, level - 1))
-}
 
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -38,8 +34,19 @@ export async function POST(req: NextRequest) {
   }
 
   // Validar cap de acciones
-  if (therian.actionsUsed >= MAX_ACTIONS) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((therian as any).actionsUsed >= MAX_ACTIONS) {
     return NextResponse.json({ error: 'MAX_ACTIONS_REACHED' }, { status: 429 })
+  }
+
+  // Cooldown de 5 minutos por Therian
+  const ACTION_COOLDOWN_MS = 5 * 60 * 1000
+  if (therian.lastActionAt) {
+    const elapsed = Date.now() - new Date(therian.lastActionAt).getTime()
+    if (elapsed < ACTION_COOLDOWN_MS) {
+      const nextActionAt = new Date(new Date(therian.lastActionAt).getTime() + ACTION_COOLDOWN_MS).toISOString()
+      return NextResponse.json({ error: 'COOLDOWN_ACTIVE', nextActionAt }, { status: 429 })
+    }
   }
 
   const actionType = body.action_type as ActionType
@@ -50,36 +57,45 @@ export async function POST(req: NextRequest) {
   const oldVal = stats[delta.stat]
   stats[delta.stat] = Math.min(100, oldVal + delta.amount)
 
-  // XP y nivel
-  let xp = therian.xp + delta.xp
-  let level = therian.level
-  const xpNeeded = xpToNextLevel(level)
-
-  if (xp >= xpNeeded) {
-    xp -= xpNeeded
-    level += 1
-  }
-
   const narrative = getNarrative(actionType)
 
-  const actionGains: Record<string, number> = JSON.parse(therian.actionGains || '{}')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actionGains: Record<string, number> = JSON.parse((therian as any).actionGains || '{}')
   actionGains[actionType] = (actionGains[actionType] ?? 0) + 1
 
-  const updated = await db.therian.update({
-    where: { id: therian.id },
-    data: {
-      stats: JSON.stringify(stats),
-      xp,
-      level,
-      actionsUsed: { increment: 1 },
-      actionGains: JSON.stringify(actionGains),
-    },
-  })
-
-  await db.user.update({
+  // XP y nivel van al User
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dba = db as any
+  const user = await dba.user.findUnique({
     where: { id: session.user.id },
-    data: { gold: { increment: delta.gold } },
-  })
+    select: { level: true, xp: true, gold: true },
+  }) as { level: number; xp: number; gold: number } | null
+
+  let userXp = (user?.xp ?? 0) + delta.xp
+  let userLevel = user?.level ?? 1
+  const xpNeeded = xpToNextLevel(userLevel)
+  let levelUp = false
+  if (userXp >= xpNeeded) {
+    userXp -= xpNeeded
+    userLevel += 1
+    levelUp = true
+  }
+
+  const [updated] = await Promise.all([
+    dba.therian.update({
+      where: { id: therian.id },
+      data: {
+        stats: JSON.stringify(stats),
+        actionsUsed: { increment: 1 },
+        actionGains: JSON.stringify(actionGains),
+        lastActionAt: new Date(),
+      },
+    }),
+    dba.user.update({
+      where: { id: session.user.id },
+      data: { gold: { increment: delta.gold }, xp: userXp, level: userLevel },
+    }),
+  ])
 
   // Log de la acción
   await db.actionLog.create({
@@ -95,7 +111,9 @@ export async function POST(req: NextRequest) {
     therian: toTherianDTO(updated),
     narrative,
     delta: { stat: delta.stat, amount: delta.amount, xp: delta.xp },
-    levelUp: level > therian.level,
+    levelUp,
     goldEarned: delta.gold,
+    userLevel,
+    userXp,
   })
 }

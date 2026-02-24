@@ -12,8 +12,8 @@ export default async function LeaderboardPage() {
   const session = await getSession()
 
   const top = await db.therian.findMany({
-    where: { name: { not: null } },
-    orderBy: [{ bites: 'desc' }, { level: 'desc' }],
+    where: { name: { not: null }, status: 'active' },
+    orderBy: [{ bites: 'desc' }, { createdAt: 'asc' }],
     take: 20,
     include: { user: { select: { id: true, name: true, email: true } } },
   })
@@ -21,15 +21,16 @@ export default async function LeaderboardPage() {
   let userRank: number | null = null
   if (session?.user?.id) {
     const userTherian = await db.therian.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, status: 'active' },
       orderBy: { bites: 'desc' },
     })
     if (userTherian) {
       const aboveCount = await db.therian.count({
         where: {
+          status: 'active',
           OR: [
             { bites: { gt: userTherian.bites } },
-            { bites: userTherian.bites, level: { gt: userTherian.level } },
+            { bites: userTherian.bites, createdAt: { lt: userTherian.createdAt } },
           ],
         },
       })
@@ -50,7 +51,6 @@ export default async function LeaderboardPage() {
         ? { id: species.id, name: species.name, emoji: species.emoji }
         : { id: t.speciesId, name: t.speciesId, emoji: '?' },
       rarity: t.rarity,
-      level: t.level,
       bites: t.bites,
       appearance: {
         paletteColors: palette

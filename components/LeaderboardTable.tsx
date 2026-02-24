@@ -12,7 +12,6 @@ interface LeaderboardEntry {
   name: string | null
   species: { id: string; name: string; emoji: string }
   rarity: string
-  level: number
   bites: number
   appearance: {
     paletteColors: { primary: string; secondary: string; accent: string }
@@ -131,7 +130,6 @@ function ProfileModal({
               {/* Species + badges */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-[#8B84B0]">
-                  <span>🔰 Nv {dto.level}</span>
                   <span>🦷 {dto.bites} mordidas</span>
                 </div>
                 <RarityBadge rarity={dto.rarity} size="sm" />
@@ -173,20 +171,6 @@ function ProfileModal({
                     </div>
                   )
                 })}
-              </div>
-
-              {/* XP */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-[#8B84B0]">
-                  <span>XP</span>
-                  <span className="font-mono">{dto.xp} / {dto.xpToNext}</span>
-                </div>
-                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full"
-                    style={{ width: `${Math.min(100, (dto.xp / dto.xpToNext) * 100)}%` }}
-                  />
-                </div>
               </div>
 
               <p className="text-center text-[#4A4468] text-xs">
@@ -247,7 +231,6 @@ export default function LeaderboardTable({ entries, userRank }: Props) {
                 </span>
               </div>
               <div className="text-[#8B84B0] text-xs flex items-center gap-1.5">
-                <span>Nv {entry.level}</span>
                 {entry.ownerId && entry.ownerName && (
                   <>
                     <span className="text-white/15">·</span>
