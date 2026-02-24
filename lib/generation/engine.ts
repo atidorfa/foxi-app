@@ -39,12 +39,21 @@ const RARITY_WEIGHTS = [
 ]
 
 const RARITY_BONUS: Record<Rarity, number> = {
-  COMMON:    0,
-  UNCOMMON:  3,
-  RARE:      8,
-  EPIC:     15,
+  COMMON:   -20,
+  UNCOMMON: -10,
+  RARE:       0,
+  EPIC:      10,
   LEGENDARY: 25,
   MYTHIC:    40,
+}
+
+const RARITY_VARIANCE: Record<Rarity, number> = {
+  COMMON:    10,
+  UNCOMMON:  10,
+  RARE:      10,
+  EPIC:      10,
+  LEGENDARY: 15,
+  MYTHIC:    10,
 }
 
 function clamp(value: number, min = 1, max = 100): number {
@@ -67,13 +76,14 @@ export function generateTherian(userId: string, secret: string): GeneratedTheria
 
   // 4. Stats
   const rarityBonus = RARITY_BONUS[rarity]
+  const variance = RARITY_VARIANCE[rarity]
   const base = 50
 
   const stats: TherianStats = {
-    vitality: clamp(base + rng.range(-10, 10) + species.bias.vitality + trait.mod.vitality + rarityBonus),
-    agility:  clamp(base + rng.range(-10, 10) + species.bias.agility  + trait.mod.agility  + rarityBonus),
-    instinct: clamp(base + rng.range(-10, 10) + species.bias.instinct + trait.mod.instinct + rarityBonus),
-    charisma: clamp(base + rng.range(-10, 10) + species.bias.charisma + trait.mod.charisma + rarityBonus),
+    vitality: clamp(base + rng.range(-variance, variance) + species.bias.vitality + trait.mod.vitality + rarityBonus),
+    agility:  clamp(base + rng.range(-variance, variance) + species.bias.agility  + trait.mod.agility  + rarityBonus),
+    instinct: clamp(base + rng.range(-variance, variance) + species.bias.instinct + trait.mod.instinct + rarityBonus),
+    charisma: clamp(base + rng.range(-variance, variance) + species.bias.charisma + trait.mod.charisma + rarityBonus),
   }
 
   // 5. Apariencia
@@ -107,13 +117,14 @@ export function generateTherianWithRarity(userId: string, secret: string, forced
   const trait = rng.choice(TRAITS)
 
   const rarityBonus = RARITY_BONUS[forcedRarity]
+  const variance = RARITY_VARIANCE[forcedRarity]
   const base = 50
 
   const stats: TherianStats = {
-    vitality: clamp(base + rng.range(-10, 10) + species.bias.vitality + trait.mod.vitality + rarityBonus),
-    agility:  clamp(base + rng.range(-10, 10) + species.bias.agility  + trait.mod.agility  + rarityBonus),
-    instinct: clamp(base + rng.range(-10, 10) + species.bias.instinct + trait.mod.instinct + rarityBonus),
-    charisma: clamp(base + rng.range(-10, 10) + species.bias.charisma + trait.mod.charisma + rarityBonus),
+    vitality: clamp(base + rng.range(-variance, variance) + species.bias.vitality + trait.mod.vitality + rarityBonus),
+    agility:  clamp(base + rng.range(-variance, variance) + species.bias.agility  + trait.mod.agility  + rarityBonus),
+    instinct: clamp(base + rng.range(-variance, variance) + species.bias.instinct + trait.mod.instinct + rarityBonus),
+    charisma: clamp(base + rng.range(-variance, variance) + species.bias.charisma + trait.mod.charisma + rarityBonus),
   }
 
   const appearance: TherianAppearance = {

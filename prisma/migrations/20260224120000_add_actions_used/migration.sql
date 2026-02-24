@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Therian" ADD COLUMN "actionsUsed" INTEGER NOT NULL DEFAULT 0;

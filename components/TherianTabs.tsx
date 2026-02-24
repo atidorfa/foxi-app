@@ -189,7 +189,7 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
                   {/* Nombre al fondo con gradiente */}
                   <div className="relative z-10 w-full bg-gradient-to-t from-[#13131F] to-transparent pt-4 pb-1.5 px-1 text-center">
                     <span className="text-[9px] font-semibold text-white/80 leading-none truncate block">
-                      {t.name ?? t.species.name}
+                      {t.name ?? 'Sin nombre'}
                     </span>
                   </div>
                 </button>

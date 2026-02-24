@@ -30,6 +30,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [exchanging, setExchanging] = useState(false)
+  const [exchangeQty, setExchangeQty] = useState(1)
   const [eggQty, setEggQty] = useState<Record<string, number>>({})
 
   const goldItems = SHOP_ITEMS.filter(i => i.costGold > 0)
@@ -37,7 +38,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
   const displayItems = tab === 'gold' ? goldItems : coinItems
   const essenciaEggs = EGGS.filter(e => e.currency === 'essencia')
   const coinEggs = EGGS.filter(e => e.currency === 'therianCoin')
-  const displayEggs = tab === 'essencia' ? essenciaEggs : coinEggs
+  const displayEggs = tab === 'coin' ? essenciaEggs : coinEggs
 
   function getEggQty(id: string) { return eggQty[id] ?? 1 }
   function setQty(id: string, val: number) {
@@ -92,20 +93,21 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
   async function handleExchange() {
     setError(null)
     setExchanging(true)
+    const amount = exchangeQty * EXCHANGE_RATE
     try {
       const res = await fetch('/api/wallet/exchange', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: EXCHANGE_RATE }),
+        body: JSON.stringify({ amount }),
       })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error === 'INSUFFICIENT_ESSENCIA'
-          ? `Necesitas ${EXCHANGE_RATE} GOLD para cambiar.`
+          ? `Necesitas ${amount.toLocaleString('es-AR')} GOLD para cambiar.`
           : 'Error al cambiar.')
         return
       }
-      onPurchase({ gold: data.gold, essence: data.essence })
+      onPurchase({ gold: data.gold, essence: data.essence, therianSlots: wallet.therianSlots })
     } catch {
       setError('Error de conexión.')
     } finally {
@@ -142,19 +144,48 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
             </span>
             <span className="text-white/20">|</span>
             <span className="flex items-center gap-1 text-blue-400">
-              <span>🪙</span>
+              <span>💎</span>
               <span className="font-semibold">{wallet.essence.toLocaleString('es-AR')} ESENCIA</span>
             </span>
           </div>
 
           {/* Exchange */}
-          <button
-            onClick={handleExchange}
-            disabled={exchanging || wallet.gold < EXCHANGE_RATE}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
-            {exchanging ? '⏳ Canjeando...' : `🪙 ${EXCHANGE_RATE} GOLD → 🪙 1 ESENCIA`}
-          </button>
+          {(() => {
+            const maxQty = Math.max(1, Math.floor(wallet.gold / EXCHANGE_RATE))
+            const clampedQty = Math.min(exchangeQty, maxQty)
+            const totalGold = clampedQty * EXCHANGE_RATE
+            const canExchange = wallet.gold >= EXCHANGE_RATE
+            return (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-lg border border-white/10 bg-white/5 overflow-hidden">
+                  <button
+                    onClick={() => setExchangeQty(q => Math.max(1, q - 1))}
+                    disabled={exchangeQty <= 1 || !canExchange}
+                    className="px-2.5 py-2 text-sm text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    −
+                  </button>
+                  <span className="w-8 text-center text-xs font-mono font-semibold text-white/80">{clampedQty}</span>
+                  <button
+                    onClick={() => setExchangeQty(q => Math.min(maxQty, q + 1))}
+                    disabled={clampedQty >= maxQty || !canExchange}
+                    className="px-2.5 py-2 text-sm text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+                <button
+                  onClick={handleExchange}
+                  disabled={exchanging || !canExchange}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  {exchanging
+                    ? '⏳ Canjeando...'
+                    : `🪙 ${totalGold.toLocaleString('es-AR')} GOLD → 💎 ${clampedQty} ESENCIA`}
+                </button>
+              </div>
+            )
+          })()}
 
           {/* Tabs */}
           <div className="flex gap-1 mt-3">
@@ -170,7 +201,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
                     : 'text-white/30 hover:text-white/60'
                 }`}
               >
-                {t === 'gold' ? '🪙 GOLD' : '🪙 ESENCIA'}
+                {t === 'gold' ? '🪙 GOLD' : '💎 ESENCIA'}
               </button>
             ))}
           </div>
@@ -195,7 +226,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
             const cost = item.costGold > 0 ? item.costGold : item.costCoin
             const costLabel = item.costGold > 0
               ? `${cost.toLocaleString('es-AR')} 🪙`
-              : `${cost} 🪙`
+              : `${cost} 💎`
             const canAfford = item.costGold > 0
               ? wallet.gold >= item.costGold
               : wallet.essence >= item.costCoin
@@ -263,15 +294,9 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
                 const isLoadingThis = loading === egg.id
                 const qty = getEggQty(egg.id)
                 const totalCost = egg.price * qty
-                const canAfford = egg.currency === 'essencia'
-                  ? wallet.essencia >= totalCost
-                  : wallet.therianCoin >= totalCost
-                const costLabel = egg.currency === 'essencia'
-                  ? `${egg.price.toLocaleString('es-AR')} 🪙 c/u`
-                  : `${egg.price} 🪙 c/u`
-                const totalLabel = egg.currency === 'essencia'
-                  ? `${totalCost.toLocaleString('es-AR')} 🪙`
-                  : `${totalCost} 🪙`
+                const canAfford = wallet.essence >= totalCost
+                const costLabel = `${egg.price.toLocaleString('es-AR')} 💎 c/u`
+                const totalLabel = `${totalCost.toLocaleString('es-AR')} 💎`
                 const RARITY_COLOR: Record<string, string> = {
                   COMMON: 'text-gray-400', UNCOMMON: 'text-emerald-400', RARE: 'text-blue-400',
                   EPIC: 'text-purple-400', LEGENDARY: 'text-amber-400', MYTHIC: 'text-red-400',

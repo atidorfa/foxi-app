@@ -55,8 +55,10 @@ export const ACTION_LABELS: Record<ActionType, { label: string; icon: string; co
 }
 
 export const ACTION_DELTAS: Record<ActionType, { stat: keyof import('../generation/engine').TherianStats; amount: number; xp: number; gold: number }> = {
-  CARE:    { stat: 'vitality', amount: 3, xp: 10, gold: 10 },
-  TRAIN:   { stat: 'agility',  amount: 3, xp: 10, gold: 10 },
-  EXPLORE: { stat: 'instinct', amount: 3, xp: 10, gold: 10 },
-  SOCIAL:  { stat: 'charisma', amount: 3, xp: 10, gold: 10 },
+  CARE:    { stat: 'vitality', amount: 1, xp: 10, gold: 10 },
+  TRAIN:   { stat: 'agility',  amount: 1, xp: 10, gold: 10 },
+  EXPLORE: { stat: 'instinct', amount: 1, xp: 10, gold: 10 },
+  SOCIAL:  { stat: 'charisma', amount: 1, xp: 10, gold: 10 },
 }
+
+export const MAX_ACTIONS = 10

@@ -46,6 +46,8 @@ model Therian {
   level        Int         @default(1)
   xp           Int         @default(0)
   lastActionAt DateTime?
+  actionsUsed  Int         @default(0)
+  actionGains  String      @default("{}") @db.Text
   createdAt    DateTime    @default(now())
   equippedRunes String     @default("[]") @db.Text
   actionLogs   ActionLog[]

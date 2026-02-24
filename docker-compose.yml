@@ -8,7 +8,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: devpassword
       POSTGRES_DB: therian_dev
-    command: ["postgres", "-c", "timezone=UTC"]
+      TZ: America/Argentina/Buenos_Aires
+    command: >
+      bash -c "ln -sf /usr/share/zoneinfo/America/Argentina/Buenos_Aires /usr/share/zoneinfo/America/Buenos_Aires
+      && exec docker-entrypoint.sh postgres -c timezone=America/Argentina/Buenos_Aires"
     ports:
       - "5435:5432"
     volumes:

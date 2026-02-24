@@ -5,6 +5,7 @@ import { getPaletteById } from './catalogs/appearance'
 import { getRuneById, type Rune } from './catalogs/runes'
 import type { TherianStats, TherianAppearance, Rarity } from './generation/engine'
 import { SHOP_ITEMS } from './shop/catalog'
+import { MAX_ACTIONS } from './actions/narratives'
 
 function parseEquippedAccessories(raw: string | null): Record<string, string> {
   try {
@@ -51,12 +52,13 @@ export function toTherianDTO(therian: Therian) {
   const trait = getTraitById(therian.traitId)
   const palette = getPaletteById(appearance.palette)
 
+  const actionsUsed = (therian as any).actionsUsed ?? 0
+  const actionsMaxed = actionsUsed >= MAX_ACTIONS
+  const canAct = !actionsMaxed
+  const actionGains: Record<string, number> = JSON.parse((therian as any).actionGains || '{}')
+
   const now = Date.now()
   const lastActionAt = therian.lastActionAt
-  const canAct = !lastActionAt || (now - new Date(lastActionAt).getTime() > COOLDOWN_MS)
-  const nextActionAt = lastActionAt
-    ? new Date(new Date(lastActionAt).getTime() + COOLDOWN_MS).toISOString()
-    : null
 
   const lastBiteAt = therian.lastBiteAt
   const canBite = !lastBiteAt || (now - new Date(lastBiteAt).getTime() > COOLDOWN_MS)
@@ -93,7 +95,10 @@ export function toTherianDTO(therian: Therian) {
     xpToNext: xpToNextLevel(therian.level),
     lastActionAt: lastActionAt ? lastActionAt.toISOString() : null,
     canAct,
-    nextActionAt,
+    nextActionAt: null,
+    actionsUsed,
+    actionsMaxed,
+    actionGains,
     canBite,
     nextBiteAt,
     equippedAccessories: parseEquippedAccessories(therian.accessories ?? null),

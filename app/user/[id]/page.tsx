@@ -2,9 +2,6 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { toTherianDTO } from '@/lib/therian-dto'
-import { getSpeciesById } from '@/lib/catalogs/species'
-import { getPaletteById } from '@/lib/catalogs/appearance'
-import type { TherianAppearance } from '@/lib/generation/engine'
 import TherianAvatar from '@/components/TherianAvatar'
 import RarityBadge from '@/components/RarityBadge'
 
@@ -92,7 +89,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                     </span>
                   </div>
                   <div className="text-[#8B84B0] text-xs">
-                    {t.species.emoji} {t.species.name} · Nv {t.level} · {t.bites} 🦷
+                    Nv {t.level} · {t.bites} 🦷
                   </div>
                 </div>
                 <RarityBadge rarity={t.rarity} size="sm" />

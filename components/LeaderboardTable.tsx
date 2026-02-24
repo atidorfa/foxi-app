@@ -130,12 +130,9 @@ function ProfileModal({
             <>
               {/* Species + badges */}
               <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <p className="text-[#8B84B0] text-xs">{dto.species.emoji} {dto.species.name}</p>
-                  <div className="flex items-center gap-2 text-xs text-[#8B84B0]">
-                    <span>🔰 Nv {dto.level}</span>
-                    <span>🦷 {dto.bites} mordidas</span>
-                  </div>
+                <div className="flex items-center gap-2 text-xs text-[#8B84B0]">
+                  <span>🔰 Nv {dto.level}</span>
+                  <span>🦷 {dto.bites} mordidas</span>
                 </div>
                 <RarityBadge rarity={dto.rarity} size="sm" />
               </div>
@@ -250,7 +247,7 @@ export default function LeaderboardTable({ entries, userRank }: Props) {
                 </span>
               </div>
               <div className="text-[#8B84B0] text-xs flex items-center gap-1.5">
-                <span>{entry.species.emoji} {entry.species.name} · Nv {entry.level}</span>
+                <span>Nv {entry.level}</span>
                 {entry.ownerId && entry.ownerName && (
                   <>
                     <span className="text-white/15">·</span>

@@ -335,7 +335,7 @@ export default function FusionModal({ therians, inventory, onClose, onSuccess }:
                         <>
                           <TherianAvatar therian={slot} size={40} animated={false} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-white text-xs font-semibold truncate leading-tight">{slot.name ?? slot.species.name}</p>
+                            <p className="text-white text-xs font-semibold truncate leading-tight">{slot.name ?? 'Sin nombre'}</p>
                             <p className={`text-[10px] font-semibold ${RARITY_COLOR[slot.rarity]}`}>{RARITY_LABEL[slot.rarity]}</p>
                           </div>
                           <span className="text-white/20 text-xs flex-shrink-0">✕</span>
@@ -414,8 +414,8 @@ export default function FusionModal({ therians, inventory, onClose, onSuccess }:
                           >
                             <TherianAvatar therian={t} size={36} animated={false} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-white text-xs font-semibold truncate leading-tight">{t.name ?? t.species.name}</p>
-                              <p className={`text-[10px] font-semibold ${RARITY_COLOR[t.rarity]}`}>{t.species.emoji} {t.species.name} · Nv {t.level}</p>
+                              <p className="text-white text-xs font-semibold truncate leading-tight">{t.name ?? 'Sin nombre'}</p>
+                              <p className={`text-[10px] font-semibold ${RARITY_COLOR[t.rarity]}`}>Nv {t.level}</p>
                             </div>
                             {isSelected && <span className="text-[10px] text-white/30 flex-shrink-0">en slot</span>}
                           </button>
@@ -493,8 +493,8 @@ export default function FusionModal({ therians, inventory, onClose, onSuccess }:
             <div className="rounded-xl border border-white/5 bg-white/3 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white font-bold">{result.therian.name ?? result.therian.species.name}</p>
-                  <p className="text-[#8B84B0] text-xs">{result.therian.species.emoji} {result.therian.species.name} · {result.therian.trait.name}</p>
+                  <p className="text-white font-bold">{result.therian.name ?? 'Sin nombre'}</p>
+                  <p className="text-[#8B84B0] text-xs">{result.therian.trait.name}</p>
                 </div>
                 <RarityBadge rarity={result.therian.rarity as Rarity} size="sm" />
               </div>

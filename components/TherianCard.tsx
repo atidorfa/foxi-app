@@ -11,6 +11,7 @@ import DailyActionButtons from './DailyActionButtons'
 import FlavorText from './FlavorText'
 import BattleArena from './BattleArena'
 import { RUNES, type Rune } from '@/lib/catalogs/runes'
+import { TRAITS } from '@/lib/catalogs/traits'
 import { ACCESSORY_SLOTS } from '@/lib/items/accessory-slots'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
 
@@ -58,6 +59,9 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [goldEarned, setGoldEarned] = useState<number | null>(null)
   const [showActionPopup, setShowActionPopup] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetConfirming, setResetConfirming] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
   const [equipping, setEquipping] = useState(false)
@@ -289,6 +293,32 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const handleBiteClose = () => {
     setShowBitePopup(false)
     handleBiteReset()
+  }
+
+  const handleActionReset = async () => {
+    setResetting(true)
+    setResetError(null)
+    try {
+      const res = await fetch('/api/therian/action-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therianId: therian.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (data.error === 'NOT_ENOUGH_GOLD') setResetError(`Necesitás ${data.required} 🪙 (tenés ${data.current})`)
+        else setResetError('Algo salió mal.')
+        return
+      }
+      setTherian(data.therian)
+      setResetConfirming(false)
+      window.dispatchEvent(new CustomEvent('wallet-update'))
+      window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.therian }))
+    } catch {
+      setResetError('Error de conexión.')
+    } finally {
+      setResetting(false)
+    }
   }
 
   const handleAction = async (actionType: string) => {
@@ -536,7 +566,6 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               </button>
             )}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-              <p className="text-[#8B84B0] text-xs">{therian.species.emoji} {therian.species.name}</p>
               <p className="text-[#8B84B0] text-xs">🔰 Nivel {therian.level}</p>
               <p className="text-[#8B84B0] text-xs">🦷 {therian.bites} mordidas</p>
               {rank !== undefined && (
@@ -575,28 +604,60 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
           )}
 
           {/* Col 2 fila 1: Acción */}
-          {therian.canAct ? (
+          {therian.actionsMaxed ? (
             <button
               onClick={() => setShowActionPopup(true)}
-              className="rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-center hover:bg-emerald-500/15 hover:border-emerald-500/50 transition-colors"
-            >
-              <p className="text-emerald-400 text-xs font-semibold leading-none mb-0.5">🌿 Templar</p>
-              <p className="text-emerald-400/70 text-xs leading-none">Disponible</p>
+              className="group/templar relative rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 hover:border-white/10 transition-colors">
+              <p className="text-white/40 text-xs font-semibold leading-none mb-0.5">🌿 Templar</p>
+              <p className="text-white/30 text-xs leading-none">10/10 completado</p>
+              {/* Tooltip de gains al hover */}
+              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 opacity-0 group-hover/templar:opacity-100 transition-opacity duration-200 w-44 rounded-xl border border-white/10 bg-[#0F0F1A]/95 backdrop-blur-sm shadow-xl p-3">
+                <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2 text-center">Stats subidos</p>
+                {[
+                  { type: 'CARE',    label: 'Vitalidad', color: 'text-emerald-400' },
+                  { type: 'TRAIN',   label: 'Agilidad',  color: 'text-yellow-400'  },
+                  { type: 'EXPLORE', label: 'Instinto',  color: 'text-blue-400'    },
+                  { type: 'SOCIAL',  label: 'Carisma',   color: 'text-pink-400'    },
+                ].map(({ type, label, color }) => {
+                  const gain = therian.actionGains?.[type] ?? 0
+                  return (
+                    <div key={type} className="flex items-center justify-between text-xs py-0.5">
+                      <span className="text-white/50">{label}</span>
+                      <span className={`font-mono font-bold ${gain > 0 ? color : 'text-white/20'}`}>
+                        {gain > 0 ? `+${gain}` : '—'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </button>
           ) : (
             <button
               onClick={() => setShowActionPopup(true)}
-              className="group rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-center hover:bg-white/5 transition-colors"
+              className="group/templar relative rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-center hover:bg-emerald-500/15 hover:border-emerald-500/50 transition-colors"
             >
-              <p className="text-white/30 text-xs font-semibold leading-none mb-0.5">🌿 Templar</p>
-              <p className="text-white/50 text-xs leading-none group-hover:hidden">
-                {therian.nextActionAt
-                  ? new Date(therian.nextActionAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-                  : 'mañana'}
-              </p>
-              <p className="text-white/70 text-xs leading-none hidden group-hover:block">
-                {therian.nextActionAt ? `Faltan ${timeRemaining(therian.nextActionAt)}` : 'mañana'}
-              </p>
+              <p className="text-emerald-400 text-xs font-semibold leading-none mb-0.5">🌿 Templar</p>
+              <p className="text-emerald-400/70 text-xs leading-none">{therian.actionsUsed}/10</p>
+              {/* Tooltip de gains al hover */}
+              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 opacity-0 group-hover/templar:opacity-100 transition-opacity duration-200 w-44 rounded-xl border border-white/10 bg-[#0F0F1A]/95 backdrop-blur-sm shadow-xl p-3">
+                <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2 text-center">Stats subidos</p>
+                {[
+                  { type: 'CARE',    label: 'Vitalidad', color: 'text-emerald-400' },
+                  { type: 'TRAIN',   label: 'Agilidad',  color: 'text-yellow-400'  },
+                  { type: 'EXPLORE', label: 'Instinto',  color: 'text-blue-400'    },
+                  { type: 'SOCIAL',  label: 'Carisma',   color: 'text-pink-400'    },
+                ].map(({ type, label, color }) => {
+                  const gain = therian.actionGains?.[type] ?? 0
+                  return (
+                    <div key={type} className="flex items-center justify-between text-xs py-0.5">
+                      <span className="text-white/50">{label}</span>
+                      <span className={`font-mono font-bold ${gain > 0 ? color : 'text-white/20'}`}>
+                        {gain > 0 ? `+${gain}` : '—'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </button>
           )}
 
@@ -651,13 +712,43 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
         </div>
 
         {/* Trait */}
-        <div className="rounded-xl border border-white/5 bg-white/3 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-[#8B84B0] text-xs uppercase tracking-widest">Arquetipo</span>
-            <span className="text-white font-semibold text-sm">{therian.trait.name}</span>
-          </div>
-          <p className="text-[#A99DC0] italic text-sm mt-1">{therian.trait.lore}</p>
-        </div>
+        {(() => {
+          return (
+            <div className="rounded-xl border border-white/5 bg-white/3 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[#8B84B0] text-xs uppercase tracking-widest">Arquetipo</span>
+                <span className="relative group/trait">
+                  <span className="text-white font-semibold text-sm cursor-default">{therian.trait.name}</span>
+                  {/* Tooltip */}
+                  <div className="pointer-events-none absolute top-0 left-full ml-2 z-50 opacity-0 group-hover/trait:opacity-100 transition-opacity duration-200 w-52 rounded-xl border border-white/10 bg-[#0F0F1A]/95 backdrop-blur-sm shadow-xl p-3">
+                    <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2 text-center">Arquetipos</p>
+                    <ul className="space-y-1">
+                      {TRAITS.map(t => {
+                        const isActive = t.id === therian.trait.id
+                        return (
+                          <li key={t.id} className={`text-xs rounded-lg px-2 py-1 ${isActive ? 'bg-white/8' : 'opacity-50'}`}>
+                            <div className="flex items-center justify-between">
+                              <span className={isActive ? 'text-white font-semibold' : 'text-white/70'}>{t.name}</span>
+                              <span className="flex gap-1.5 font-mono text-[10px]">
+                                {t.mod.vitality !== 0 && <span className={t.mod.vitality > 0 ? 'text-emerald-400' : 'text-red-400'}>{t.mod.vitality > 0 ? '+' : ''}{t.mod.vitality}🌿</span>}
+                                {t.mod.agility  !== 0 && <span className={t.mod.agility  > 0 ? 'text-yellow-400' : 'text-red-400'}>{t.mod.agility  > 0 ? '+' : ''}{t.mod.agility}⚡</span>}
+                                {t.mod.instinct !== 0 && <span className={t.mod.instinct > 0 ? 'text-blue-400'   : 'text-red-400'}>{t.mod.instinct > 0 ? '+' : ''}{t.mod.instinct}🌌</span>}
+                                {t.mod.charisma !== 0 && <span className={t.mod.charisma > 0 ? 'text-pink-400'  : 'text-red-400'}>{t.mod.charisma > 0 ? '+' : ''}{t.mod.charisma}✨</span>}
+                              </span>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    {/* Arrow */}
+                    <div className="absolute top-3 right-full w-0 h-0 border-t-4 border-b-4 border-r-4 border-t-transparent border-b-transparent border-r-white/10" />
+                  </div>
+                </span>
+              </div>
+              <p className="text-[#A99DC0] italic text-sm mt-1">{therian.trait.lore}</p>
+            </div>
+          )
+        })()}
 
 
 
@@ -774,7 +865,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-white font-bold">{target.name}</div>
-                    <div className="text-[#8B84B0] text-sm">{target.species.emoji} {target.species.name} · Nv {target.level}</div>
+                    <div className="text-[#8B84B0] text-sm">Nv {target.level}</div>
                   </div>
                   <div className="text-right">
                     <div className={`text-sm font-semibold ${
@@ -1008,8 +1099,15 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
             className="bg-[#13131F] border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-white font-semibold text-sm uppercase tracking-widest">Templar el espíritu</h3>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-white font-semibold text-sm uppercase tracking-widest">Templar el espíritu</h3>
+                <p className="text-[#8B84B0] text-xs mt-1">Ganarás:</p>
+                <div className="flex gap-3 mt-0.5">
+                  <span className="text-purple-400 text-xs font-mono">+10 XP</span>
+                  <span className="text-amber-400 text-xs font-mono">+10 🪙</span>
+                </div>
+              </div>
               <button
                 onClick={() => setShowActionPopup(false)}
                 className="text-white/30 hover:text-white/70 text-lg leading-none transition-colors"
@@ -1040,6 +1138,43 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
                 ✦ ¡Tu Therian alcanzó el nivel {therian.level}! ✦
               </div>
             )}
+
+            {/* Reset button */}
+            <div className="pt-1 border-t border-white/5">
+              {resetConfirming ? (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 space-y-2">
+                  <p className="text-red-300 text-xs text-center font-semibold">¿Reiniciar los 10 usos?</p>
+                  <p className="text-white/30 text-[10px] text-center">Se deducirán 1000 🪙 de tu cuenta</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setResetConfirming(false); setResetError(null) }}
+                      disabled={resetting}
+                      className="flex-1 py-1.5 rounded-lg border border-white/10 text-white/40 hover:text-white/70 text-xs transition-colors disabled:opacity-40"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleActionReset}
+                      disabled={resetting}
+                      className="flex-1 py-1.5 rounded-lg bg-red-700 hover:bg-red-600 text-white text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {resetting ? 'Reiniciando...' : 'Confirmar'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setResetConfirming(true); setResetError(null) }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-white/5 bg-white/3 hover:border-red-500/30 hover:bg-red-500/5 transition-all group"
+                >
+                  <span className="text-white/30 text-xs group-hover:text-red-400 transition-colors">↺ Reiniciar usos</span>
+                  <span className="text-amber-400/60 text-xs font-mono group-hover:text-amber-400 transition-colors">1000 🪙</span>
+                </button>
+              )}
+              {resetError && (
+                <p className="text-red-400 text-xs text-center mt-1.5">{resetError}</p>
+              )}
+            </div>
 
           </div>
         </div>

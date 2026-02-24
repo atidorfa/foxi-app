@@ -128,10 +128,7 @@ export default function AdoptPage() {
           <div className="space-y-6">
             <div className="text-center">
               <p className="text-[#8B84B0] text-sm uppercase tracking-widest mb-2">Tu Therian</p>
-              <h1 className="text-3xl font-bold text-white">
-                {therian.species.emoji} {therian.species.name}
-              </h1>
-              <div className="flex justify-center mt-3">
+              <div className="flex justify-center mt-1">
                 <RarityBadge rarity={therian.rarity} size="lg"/>
               </div>
             </div>
@@ -156,10 +153,6 @@ export default function AdoptPage() {
                 ))}
               </div>
             </div>
-
-            <p className="text-[#A99DC0] text-center text-sm italic">
-              {therian.species.lore}
-            </p>
 
             <button
               onClick={() => router.push('/therian')}

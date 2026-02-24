@@ -94,7 +94,6 @@ export default async function TherianProfilePage({
               <div className="flex-1 min-w-0 pr-3">
                 <h1 className="text-2xl font-bold text-white">{dto.name}</h1>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-                  <p className="text-[#8B84B0] text-xs">{dto.species.emoji} {dto.species.name}</p>
                   <p className="text-[#8B84B0] text-xs">🔰 Nivel {dto.level}</p>
                   <p className="text-[#8B84B0] text-xs">🦷 {dto.bites} mordidas</p>
                   <p className="text-[#8B84B0] text-xs">🏆 #{rank}</p>
@@ -144,11 +143,6 @@ export default async function TherianProfilePage({
                 />
               </div>
             </div>
-
-            {/* Species lore */}
-            {dto.species.lore && (
-              <p className="text-center text-[#4A4468] text-xs italic">&ldquo;{dto.species.lore}&rdquo;</p>
-            )}
 
             {/* Adoption date */}
             <p className="text-center text-[#4A4468] text-xs">
