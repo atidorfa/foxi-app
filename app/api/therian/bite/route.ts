@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { toTherianDTO } from '@/lib/therian-dto'
 import { calculateBattle } from '@/lib/battle/engine'
 
-const COOLDOWN_MS = 24 * 60 * 60 * 1000
+const COOLDOWN_MS = 5 * 60 * 1000
 
 const BodySchema = z.object({
   target_name: z.string().min(1),
@@ -69,12 +69,35 @@ export async function POST(req: NextRequest) {
   )
 
   const challengerWon = result.winner === 'challenger'
-  const GOLD_WIN  = 25
-  const GOLD_LOSE = 10
+  const GOLD_WIN = 10
+  const GOLD_LOSE = 0
+  const XP_WIN = 10
+
+  // Fetch user xp/level for level-up computation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dba = db as any
+  const userRecord = await dba.user.findUnique({
+    where: { id: session.user.id },
+    select: { xp: true, level: true },
+  }) as { xp: number; level: number } | null
+
+  let xpEarned = 0
+  let userUpdate: Record<string, unknown> = { gold: { increment: challengerWon ? GOLD_WIN : GOLD_LOSE } }
+  if (challengerWon) {
+    xpEarned = XP_WIN
+    let newXp = (userRecord?.xp ?? 0) + XP_WIN
+    let newLevel = userRecord?.level ?? 1
+    const xpNeeded = Math.floor(100 * Math.pow(1.5, newLevel - 1))
+    if (newXp >= xpNeeded) { newXp -= xpNeeded; newLevel += 1 }
+    userUpdate = { ...userUpdate, xp: newXp, level: newLevel }
+  }
 
   // Persist in a transaction
   const [updatedChallenger, updatedTarget] = await db.$transaction(async (tx) => {
-    await tx.battleLog.create({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const txa = tx as any
+
+    await txa.battleLog.create({
       data: {
         challengerId: challenger!.id,
         targetId: target.id,
@@ -83,26 +106,27 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    const uc = await tx.therian.update({
+    // Track bite attempts in actionGains regardless of win/lose (for achievements)
+    const gains: Record<string, number> = JSON.parse((challenger as any).actionGains || '{}')
+    gains['BITE'] = (gains['BITE'] ?? 0) + 1
+
+    const uc = await txa.therian.update({
       where: { id: challenger!.id },
       data: {
         lastBiteAt: new Date(),
         bites: challengerWon ? { increment: 1 } : undefined,
+        actionGains: JSON.stringify(gains),
       },
     })
 
-    const ut = await tx.therian.update({
+    const ut = await txa.therian.update({
       where: { id: target.id },
       data: {
         bites: challengerWon ? undefined : { increment: 1 },
       },
     })
 
-    // Award GOLD to challenger
-    await tx.user.update({
-      where: { id: session.user.id },
-      data: { gold: { increment: challengerWon ? GOLD_WIN : GOLD_LOSE } },
-    })
+    await txa.user.update({ where: { id: session.user.id }, data: userUpdate })
 
     return [uc, ut]
   })
@@ -115,5 +139,6 @@ export async function POST(req: NextRequest) {
     target: toTherianDTO(updatedTarget),
     biteAwarded: challengerWon,
     goldEarned,
+    xpEarned,
   })
 }

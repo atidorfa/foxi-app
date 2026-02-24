@@ -8,12 +8,14 @@ export async function GET() {
     return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 })
   }
 
-  const user = await db.user.findUnique({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const user = await (db as any).user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, email: true, name: true, createdAt: true },
-  })
+    select: { id: true, email: true, name: true, createdAt: true, level: true, xp: true },
+  }) as { id: string; email: string; name: string | null; createdAt: Date; level: number; xp: number } | null
 
   if (!user) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
 
-  return NextResponse.json(user)
+  const xpToNext = Math.floor(100 * Math.pow(1.5, user.level - 1))
+  return NextResponse.json({ ...user, xpToNext })
 }

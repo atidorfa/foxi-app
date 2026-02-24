@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import TherianAvatar from '@/components/TherianAvatar'
 import RarityBadge from '@/components/RarityBadge'
@@ -13,6 +13,14 @@ export default function AdoptPage() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [therian, setTherian] = useState<TherianDTO | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [adoptInfo, setAdoptInfo] = useState<{ cost: number; gold: number; canAfford: boolean } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/therian/adopt')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setAdoptInfo(data) })
+      .catch(() => {})
+  }, [])
 
   const handleAdopt = async () => {
     setPhase('summoning')
@@ -25,11 +33,13 @@ export default function AdoptPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        if (data.error === 'NO_SLOTS_AVAILABLE') {
-          router.push('/therian')
-          return
+        if (data.error === 'INSUFFICIENT_GOLD') {
+          setError(`Oro insuficiente. Necesitás 🪙 ${data.required} para despertar otro Therian.`)
+        } else {
+          setError('Algo salió mal. Intenta de nuevo.')
         }
-        throw new Error(data.error)
+        setPhase('idle')
+        return
       }
 
       setTherian(data)
@@ -65,6 +75,12 @@ export default function AdoptPage() {
         {phase === 'idle' && (
           <div className="text-center space-y-8">
             <div>
+              <button
+                onClick={() => router.back()}
+                className="text-white/35 hover:text-white/60 text-sm transition-colors mb-4 block text-left"
+              >
+                ← Volver
+              </button>
               <h1 className="text-4xl font-bold text-white mb-3">Tu Therian espera</h1>
               <p className="text-[#8B84B0] text-lg leading-relaxed">
                 Hay uno ahí afuera que lleva tu nombre.<br/>
@@ -90,6 +106,19 @@ export default function AdoptPage() {
               ))}
             </div>
 
+            {adoptInfo && adoptInfo.cost > 0 && (
+              <div className={`rounded-xl border px-4 py-3 text-sm text-center ${
+                adoptInfo.canAfford
+                  ? 'border-yellow-500/20 bg-yellow-500/5 text-yellow-300/80'
+                  : 'border-red-500/20 bg-red-500/5 text-red-300/80'
+              }`}>
+                {adoptInfo.canAfford
+                  ? <>Costo: <span className="font-bold">🪙 {adoptInfo.cost} Oro</span> · Tenés {adoptInfo.gold} 🪙</>
+                  : <>Oro insuficiente. Necesitás <span className="font-bold">🪙 {adoptInfo.cost}</span> y solo tenés {adoptInfo.gold} 🪙</>
+                }
+              </div>
+            )}
+
             {error && (
               <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-red-300 text-sm">
                 {error}
@@ -98,10 +127,12 @@ export default function AdoptPage() {
 
             <button
               onClick={handleAdopt}
-              className="w-full bg-gradient-to-r from-purple-700 to-purple-500 hover:from-purple-600 hover:to-purple-400 text-white font-bold py-5 rounded-2xl text-lg transition-all duration-300 active:scale-[0.98] shadow-[0_0_30px_rgba(155,89,182,0.4)]"
+              disabled={adoptInfo?.canAfford === false}
+              className="w-full bg-gradient-to-r from-purple-700 to-purple-500 hover:from-purple-600 hover:to-purple-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-5 rounded-2xl text-lg transition-all duration-300 active:scale-[0.98] shadow-[0_0_30px_rgba(155,89,182,0.4)]"
             >
-              Despertar mi Therian
+              {adoptInfo?.cost ? `Despertar mi Therian · 🪙 ${adoptInfo.cost}` : 'Despertar mi Therian'}
             </button>
+
           </div>
         )}
 
@@ -127,7 +158,9 @@ export default function AdoptPage() {
         {phase === 'revealed' && therian && (
           <div className="space-y-6">
             <div className="text-center">
-              <p className="text-[#8B84B0] text-sm uppercase tracking-widest mb-2">Tu Therian</p>
+              <p className="text-[#8B84B0] text-sm uppercase tracking-widest mb-2">
+                {therian.status === 'capsule' ? 'Therian encapsulado' : 'Tu Therian'}
+              </p>
               <div className="flex justify-center mt-1">
                 <RarityBadge rarity={therian.rarity} size="lg"/>
               </div>
@@ -154,11 +187,17 @@ export default function AdoptPage() {
               </div>
             </div>
 
+            {therian.status === 'capsule' && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-amber-300/80 text-sm text-center">
+                No tenías slots disponibles. Tu Therian fue guardado en el inventario como cápsula. Liberalo cuando tengas espacio.
+              </div>
+            )}
+
             <button
               onClick={() => router.push('/therian')}
               className="w-full bg-gradient-to-r from-purple-700 to-purple-500 hover:from-purple-600 hover:to-purple-400 text-white font-bold py-4 rounded-2xl transition-all duration-200 active:scale-[0.98]"
             >
-              Ver mi Therian →
+              {therian.status === 'capsule' ? 'Ver inventario →' : 'Ver mi Therian →'}
             </button>
           </div>
         )}
