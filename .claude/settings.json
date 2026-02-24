@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/jonae/AppData/Local/**)",
+      "Bash(npx dotenv-cli:*)",
+      "Bash(taskkill:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git rebase:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx:*)",
+      "Bash(Remove-Item -Recurse -Force \"c:\\\\Users\\\\jonae\\\\Desktop\\\\Reposotorios\\\\therian.biz\\\\.next\" -ErrorAction SilentlyContinue)",
+      "Bash(Write-Output \"Cache limpiado\")",
+      "Bash(docker ps:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd /c \"taskkill /PID 32068 /F\")",
+      "Bash(cmd /c \"taskkill /PID 32068 /F 2>&1\")",
+      "Bash(git pull:*)",
+      "Bash(DIRECT_URL=\"postgresql://postgres:devpassword@localhost:5435/therian_dev\" DATABASE_URL=\"postgresql://postgres:devpassword@localhost:5435/therian_dev\" npx prisma:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)",
+      "Bash(curl:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\jonae\\Desktop\\Reposotorios\\therian.biz\\app\\user",
+      "c:\\Users\\jonae\\Desktop\\Reposotorios\\therian.biz\\.next\\dev"
+    ]
+  }
+}
