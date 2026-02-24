@@ -43,7 +43,7 @@ export default function CurrencyDisplay() {
       </div>
       {/* ESENCIA — premium, intercambiable */}
       <div className="flex items-center gap-1.5 rounded-full border border-blue-700/30 bg-blue-900/20 px-3 py-1.5">
-        <span className="text-sm">🪙</span>
+        <span className="text-sm">💎</span>
         <span className="text-blue-400 font-semibold">
           {wallet.essence.toLocaleString('es-AR')}
         </span>

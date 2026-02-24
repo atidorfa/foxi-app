@@ -11,6 +11,7 @@ import DailyActionButtons from './DailyActionButtons'
 import FlavorText from './FlavorText'
 import BattleArena from './BattleArena'
 import { RUNES, type Rune } from '@/lib/catalogs/runes'
+import { TRAITS } from '@/lib/catalogs/traits'
 import { ACCESSORY_SLOTS } from '@/lib/items/accessory-slots'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
 
@@ -651,13 +652,43 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
         </div>
 
         {/* Trait */}
-        <div className="rounded-xl border border-white/5 bg-white/3 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-[#8B84B0] text-xs uppercase tracking-widest">Arquetipo</span>
-            <span className="text-white font-semibold text-sm">{therian.trait.name}</span>
-          </div>
-          <p className="text-[#A99DC0] italic text-sm mt-1">{therian.trait.lore}</p>
-        </div>
+        {(() => {
+          return (
+            <div className="rounded-xl border border-white/5 bg-white/3 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[#8B84B0] text-xs uppercase tracking-widest">Arquetipo</span>
+                <span className="relative group/trait">
+                  <span className="text-white font-semibold text-sm cursor-default">{therian.trait.name}</span>
+                  {/* Tooltip */}
+                  <div className="pointer-events-none absolute top-0 left-full ml-2 z-50 opacity-0 group-hover/trait:opacity-100 transition-opacity duration-200 w-52 rounded-xl border border-white/10 bg-[#0F0F1A]/95 backdrop-blur-sm shadow-xl p-3">
+                    <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2 text-center">Arquetipos</p>
+                    <ul className="space-y-1">
+                      {TRAITS.map(t => {
+                        const isActive = t.id === therian.trait.id
+                        return (
+                          <li key={t.id} className={`text-xs rounded-lg px-2 py-1 ${isActive ? 'bg-white/8' : 'opacity-50'}`}>
+                            <div className="flex items-center justify-between">
+                              <span className={isActive ? 'text-white font-semibold' : 'text-white/70'}>{t.name}</span>
+                              <span className="flex gap-1.5 font-mono text-[10px]">
+                                {t.mod.vitality !== 0 && <span className={t.mod.vitality > 0 ? 'text-emerald-400' : 'text-red-400'}>{t.mod.vitality > 0 ? '+' : ''}{t.mod.vitality}🌿</span>}
+                                {t.mod.agility  !== 0 && <span className={t.mod.agility  > 0 ? 'text-yellow-400' : 'text-red-400'}>{t.mod.agility  > 0 ? '+' : ''}{t.mod.agility}⚡</span>}
+                                {t.mod.instinct !== 0 && <span className={t.mod.instinct > 0 ? 'text-blue-400'   : 'text-red-400'}>{t.mod.instinct > 0 ? '+' : ''}{t.mod.instinct}🌌</span>}
+                                {t.mod.charisma !== 0 && <span className={t.mod.charisma > 0 ? 'text-amber-400'  : 'text-red-400'}>{t.mod.charisma > 0 ? '+' : ''}{t.mod.charisma}✨</span>}
+                              </span>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    {/* Arrow */}
+                    <div className="absolute top-3 right-full w-0 h-0 border-t-4 border-b-4 border-r-4 border-t-transparent border-b-transparent border-r-white/10" />
+                  </div>
+                </span>
+              </div>
+              <p className="text-[#A99DC0] italic text-sm mt-1">{therian.trait.lore}</p>
+            </div>
+          )
+        })()}
 
 
 
