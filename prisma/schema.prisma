@@ -59,8 +59,9 @@ model Therian {
   name        String?   @unique
   bites       Int       @default(0)
   lastBiteAt  DateTime?
-  accessories String    @default("[]") @db.Text
-  status      String    @default("active") // "active" | "capsule"
+  accessories       String    @default("[]") @db.Text
+  status            String    @default("active") // "active" | "capsule"
+  equippedAbilities String    @default("[]") @db.Text // JSON: string[] ability IDs, max 4
 
   battlesAsChallenger BattleLog[] @relation("Challenger")
   battlesAsTarget     BattleLog[] @relation("Target")
@@ -99,6 +100,18 @@ model ActionLog {
   delta      String   @db.Text
   narrative  String   @db.Text
   createdAt  DateTime @default(now())
+}
+
+model PvpBattle {
+  id           String   @id @default(uuid())
+  attackerId   String   // userId del jugador
+  attackerTeam String   @db.Text // JSON: therianId[] (3 IDs)
+  defenderTeam String   @db.Text // JSON: therianId[] (3 IDs, ghost)
+  state        String   @db.Text // JSON: BattleState completo
+  status       String   @default("active") // "active" | "completed"
+  winnerId     String?  // userId del ganador (null si ganó el defensor)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model InventoryItem {

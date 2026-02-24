@@ -15,6 +15,7 @@ import { RUNES, type Rune } from '@/lib/catalogs/runes'
 import { TRAITS } from '@/lib/catalogs/traits'
 import { ACCESSORY_SLOTS } from '@/lib/items/accessory-slots'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
+import { ABILITIES, INNATE_BY_ARCHETYPE } from '@/lib/pvp/abilities'
 
 interface Props {
   therian: TherianDTO
@@ -79,6 +80,12 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
   const [showCapsuleConfirm, setShowCapsuleConfirm] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
   const [equipping, setEquipping] = useState(false)
+
+  // PvP Abilities
+  const [showAbilities, setShowAbilities] = useState(false)
+  const [pendingAbilities, setPendingAbilities] = useState<string[]>(therian.equippedAbilities ?? [])
+  const [savingAbilities, setSavingAbilities] = useState(false)
+  const [abilitiesError, setAbilitiesError] = useState<string | null>(null)
 
   // Accessories panel (left side)
   const [showAccessories, setShowAccessories] = useState(false)
@@ -209,6 +216,35 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
       setEquippingAccessory(false)
       setSelectedAccessorySlot(null)
     }
+  }
+
+  const handleSaveAbilities = async () => {
+    setSavingAbilities(true)
+    setAbilitiesError(null)
+    try {
+      const res = await fetch('/api/therian/equip-abilities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therianId: therian.id, abilityIds: pendingAbilities }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setAbilitiesError(data.error ?? 'Error al guardar.'); return }
+      setTherian(prev => ({ ...prev, equippedAbilities: pendingAbilities }))
+      window.dispatchEvent(new CustomEvent('therian-updated', { detail: { ...therian, equippedAbilities: pendingAbilities } }))
+      setShowAbilities(false)
+    } catch {
+      setAbilitiesError('Error de conexión.')
+    } finally {
+      setSavingAbilities(false)
+    }
+  }
+
+  function toggleAbility(id: string) {
+    setPendingAbilities(prev => {
+      if (prev.includes(id)) return prev.filter(a => a !== id)
+      if (prev.length >= 3) return prev
+      return [...prev, id]
+    })
   }
 
   // Name editing
@@ -828,6 +864,121 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
         })()}
 
 
+
+        {/* PvP Abilities */}
+        {(() => {
+          const archetype = therian.trait.id
+          const innate = INNATE_BY_ARCHETYPE[archetype]
+          const archAbilities = ABILITIES.filter(a => a.archetype === archetype)
+          const hasPanel = archAbilities.length > 0
+
+          if (!hasPanel) return null
+
+          const ARCH_COLORS: Record<string, { text: string; border: string; bg: string }> = {
+            forestal:  { text: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' },
+            electrico: { text: 'text-yellow-400',  border: 'border-yellow-500/30',  bg: 'bg-yellow-500/10' },
+            acuatico:  { text: 'text-blue-400',    border: 'border-blue-500/30',    bg: 'bg-blue-500/10' },
+            volcanico: { text: 'text-orange-400',  border: 'border-orange-500/30',  bg: 'bg-orange-500/10' },
+          }
+          const colors = ARCH_COLORS[archetype] ?? ARCH_COLORS.forestal
+          const hasPendingChange = JSON.stringify([...pendingAbilities].sort()) !== JSON.stringify([...(therian.equippedAbilities ?? [])].sort())
+
+          return (
+            <div className="space-y-2">
+              <button
+                onClick={() => { setShowAbilities(p => !p); setAbilitiesError(null) }}
+                className="w-full flex items-center justify-between text-xs text-white/40 hover:text-white/60 transition-colors py-1"
+              >
+                <span className="flex items-center gap-1.5">
+                  <span>⚔️</span>
+                  <span className="uppercase tracking-widest font-semibold">Habilidades PvP</span>
+                  {(therian.equippedAbilities?.length ?? 0) > 0 && (
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${colors.bg} ${colors.text} border ${colors.border}`}>
+                      {therian.equippedAbilities!.length}/3
+                    </span>
+                  )}
+                </span>
+                <span className={`transition-transform duration-300 ${showAbilities ? 'rotate-180' : ''}`}>▾</span>
+              </button>
+
+              {showAbilities && (
+                <div className="space-y-3 pb-1">
+                  {/* Innate (read-only) */}
+                  {innate && (
+                    <div>
+                      <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1.5">Innato (siempre activo)</p>
+                      <div className={`rounded-lg border ${colors.border} ${colors.bg} px-3 py-2 flex items-center justify-between`}>
+                        <span className={`text-xs font-semibold ${colors.text}`}>★ {innate.name}</span>
+                        <span className="text-white/30 text-[10px]">Daño básico</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Equipable (toggle max 4) */}
+                  <div>
+                    <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1.5">
+                      Equipables ({pendingAbilities.length}/3)
+                    </p>
+                    <div className="space-y-1.5">
+                      {archAbilities.map(ab => {
+                        const isOn = pendingAbilities.includes(ab.id)
+                        const canToggle = isOn || pendingAbilities.length < 3
+                        return (
+                          <button
+                            key={ab.id}
+                            onClick={() => canToggle && toggleAbility(ab.id)}
+                            disabled={!canToggle}
+                            className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 transition-all ${
+                              isOn
+                                ? `${colors.border} ${colors.bg}`
+                                : canToggle
+                                  ? 'border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5'
+                                  : 'border-white/5 bg-white/2 opacity-30 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="text-left">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-xs font-semibold ${isOn ? colors.text : 'text-white/60'}`}>
+                                  {ab.name}
+                                </span>
+                                {ab.type === 'passive' && (
+                                  <span className="text-[10px] text-white/30 border border-white/15 px-1 rounded">(P)</span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-white/30 mt-0.5">
+                                {ab.target === 'all' ? 'AoE' : ab.target === 'ally' ? 'Aliado' : ab.target === 'self' ? 'Propio' : 'Objetivo'}
+                                {ab.cooldown > 0 && ` · CD ${ab.cooldown}t`}
+                              </div>
+                            </div>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              isOn ? `border-white/50 bg-white/20` : 'border-white/20'
+                            }`}>
+                              {isOn && <span className={`text-[10px] font-bold ${colors.text}`}>✓</span>}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {abilitiesError && (
+                    <p className="text-red-400 text-xs text-center">{abilitiesError}</p>
+                  )}
+
+                  {hasPendingChange && (
+                    <button
+                      onClick={handleSaveAbilities}
+                      disabled={savingAbilities}
+                      className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-semibold transition-all disabled:opacity-40"
+                    >
+                      {savingAbilities ? 'Guardando...' : '💾 Guardar habilidades'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Adoption date */}
         <p className="text-center text-[#4A4468] text-xs italic">

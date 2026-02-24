@@ -92,6 +92,7 @@ export default async function TherianPage() {
           <NavInventoryButton />
           <CurrencyDisplay />
           <NavShopButton therian={primaryTherian} />
+          <Link href="/pvp" className="text-[#8B84B0] hover:text-white text-sm transition-colors">⚔️ PvP</Link>
           <Link href="/leaderboard" className="text-[#8B84B0] hover:text-white text-sm transition-colors">🏆 Top</Link>
           <SignOutButton/>
         </div>
