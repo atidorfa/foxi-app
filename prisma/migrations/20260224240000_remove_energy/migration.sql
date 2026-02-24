@@ -1,0 +1,3 @@
+ALTER TABLE "User" DROP COLUMN IF EXISTS "energy";
+ALTER TABLE "User" DROP COLUMN IF EXISTS "energyResetDate";
+ALTER TABLE "User" DROP COLUMN IF EXISTS "energyLastUpdatedAt";

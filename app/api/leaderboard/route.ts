@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const top = await db.therian.findMany({
     where: { name: { not: null } },
-    orderBy: [{ bites: 'desc' }, { level: 'desc' }],
+    orderBy: [{ bites: 'desc' }, { createdAt: 'asc' }],
     take: limit,
   })
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         where: {
           OR: [
             { bites: { gt: userTherian.bites } },
-            { bites: userTherian.bites, level: { gt: userTherian.level } },
+            { bites: userTherian.bites, createdAt: { lt: userTherian.createdAt } },
           ],
         },
       })
@@ -50,7 +50,6 @@ export async function GET(req: NextRequest) {
         ? { id: species.id, name: species.name, emoji: species.emoji }
         : { id: t.speciesId, name: t.speciesId, emoji: '?' },
       rarity: t.rarity,
-      level: t.level,
       bites: t.bites,
       appearance: {
         palette: appearance.palette,

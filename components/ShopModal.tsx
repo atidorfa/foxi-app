@@ -36,9 +36,9 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
   const goldItems = SHOP_ITEMS.filter(i => i.costGold > 0)
   const coinItems = SHOP_ITEMS.filter(i => i.costCoin > 0)
   const displayItems = tab === 'gold' ? goldItems : coinItems
-  const essenciaEggs = EGGS.filter(e => e.currency === 'essence')
-  const coinEggs = EGGS.filter(e => e.currency === 'gold')
-  const displayEggs = tab === 'coin' ? essenciaEggs : coinEggs
+  const goldEggs = EGGS.filter(e => e.currency === 'gold')
+  const essenceEggs = EGGS.filter(e => e.currency === 'essence')
+  const displayEggs = tab === 'gold' ? goldEggs : essenceEggs
 
   function getEggQty(id: string) { return eggQty[id] ?? 1 }
   function setQty(id: string, val: number) {
@@ -294,9 +294,11 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
                 const isLoadingThis = loading === egg.id
                 const qty = getEggQty(egg.id)
                 const totalCost = egg.price * qty
-                const canAfford = wallet.essence >= totalCost
-                const costLabel = `${egg.price.toLocaleString('es-AR')} 💎 c/u`
-                const totalLabel = `${totalCost.toLocaleString('es-AR')} 💎`
+                const isGoldEgg = egg.currency === 'gold'
+                const canAfford = isGoldEgg ? wallet.gold >= totalCost : wallet.essence >= totalCost
+                const currencyIcon = isGoldEgg ? '🪙' : '💎'
+                const costLabel = `${egg.price.toLocaleString('es-AR')} ${currencyIcon} c/u`
+                const totalLabel = `${totalCost.toLocaleString('es-AR')} ${currencyIcon}`
                 const RARITY_COLOR: Record<string, string> = {
                   COMMON: 'text-gray-400', UNCOMMON: 'text-emerald-400', RARE: 'text-blue-400',
                   EPIC: 'text-purple-400', LEGENDARY: 'text-amber-400', MYTHIC: 'text-red-400',
