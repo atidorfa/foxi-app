@@ -109,10 +109,12 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
 
   const active = localTherians.find(t => t.id === activeId) ?? localTherians[0]
   const hasAvailableSlot = therians.length < slots
-  const showGrid = therians.length > 1 || hasAvailableSlot
+  // Always show the adopt cell unless all 8 therian slots are occupied
+  const showAdoptCell = sortedTherians.length < 8
+  const showGrid = sortedTherians.length > 1 || showAdoptCell
 
-  // Up to 8 cells: real therians + 1 adopt cell if available
-  const totalCells = Math.min(8, sortedTherians.length + (hasAvailableSlot ? 1 : 0))
+  // Up to 8 cells: real therians + 1 adopt cell if there's room
+  const totalCells = Math.min(8, sortedTherians.length + (showAdoptCell ? 1 : 0))
 
   const handleDragStart = (index: number) => {
     dragIndexRef.current = index
@@ -157,11 +159,25 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
                 return (
                   <button
                     key="adopt"
-                    onClick={() => router.push('/adopt')}
-                    className="flex flex-col items-center justify-center gap-1.5 w-[80px] h-[96px] rounded-xl border border-dashed border-white/15 bg-white/3 hover:border-white/30 hover:bg-white/6 transition-all"
+                    onClick={() => {
+                      if (hasAvailableSlot) {
+                        router.push('/adopt')
+                      } else {
+                        window.dispatchEvent(new CustomEvent('open-shop', { detail: { tab: 'coin', highlight: 'slot_extra' } }))
+                      }
+                    }}
+                    className={`flex flex-col items-center justify-center gap-1.5 w-[80px] h-[96px] rounded-xl border border-dashed transition-all ${
+                      hasAvailableSlot
+                        ? 'border-white/15 bg-white/3 hover:border-white/30 hover:bg-white/6'
+                        : 'border-amber-500/20 bg-amber-500/4 hover:border-amber-500/40 hover:bg-amber-500/8'
+                    }`}
                   >
-                    <span className="text-2xl text-white/25">+</span>
-                    <span className="text-[10px] text-white/25 font-medium">Adoptar</span>
+                    <span className={`text-xl ${hasAvailableSlot ? 'text-white/25' : 'text-amber-500/50'}`}>
+                      {hasAvailableSlot ? '+' : '🛒'}
+                    </span>
+                    <span className={`text-[10px] font-medium ${hasAvailableSlot ? 'text-white/25' : 'text-amber-500/60'}`}>
+                      {hasAvailableSlot ? 'Adoptar' : '+ Slot'}
+                    </span>
                   </button>
                 )
               }
@@ -223,7 +239,7 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
       )}
 
       {/* TherianCard del activo */}
-      {active && <TherianCard key={active.id} therian={active} rank={ranks[active.id]} />}
+      {active && <TherianCard key={active.id} therian={active} rank={ranks[active.id]} slots={slots} />}
     </div>
   )
 }

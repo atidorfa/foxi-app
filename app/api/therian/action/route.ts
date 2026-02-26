@@ -7,9 +7,10 @@ import type { ActionType } from '@/lib/actions/narratives'
 import type { TherianStats } from '@/lib/generation/engine'
 import { z } from 'zod'
 
+const ACTIONS: ActionType[] = ['CARE', 'TRAIN', 'EXPLORE', 'SOCIAL']
+
 const schema = z.object({
-  action_type: z.enum(['CARE', 'TRAIN', 'EXPLORE', 'SOCIAL']),
-  therianId:   z.string(),
+  therianId: z.string(),
 })
 
 export async function POST(req: NextRequest) {
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const actionType = body.action_type as ActionType
+  const actionType = ACTIONS[Math.floor(Math.random() * ACTIONS.length)]
   const delta = ACTION_DELTAS[actionType]
   const stats: TherianStats = JSON.parse(therian.stats)
 
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
     therian: toTherianDTO(updated),
     narrative,
     delta: { stat: delta.stat, amount: delta.amount, xp: delta.xp },
+    actionType,
     levelUp,
     goldEarned: delta.gold,
     userLevel,

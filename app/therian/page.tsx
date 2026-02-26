@@ -63,7 +63,7 @@ export default async function TherianPage() {
 
   // Compute achievement states
   const claimed: string[] = JSON.parse(user?.claimedAchievements ?? '[]')
-  const achievementUser = { level: user?.level ?? 1, therians: user?.therians ?? [] }
+  const achievementUser = { level: user?.level ?? 1, therianSlots: user?.therianSlots ?? 1, therians: user?.therians ?? [] }
   const achievementEntries = ACHIEVEMENTS.map(a => ({
     id: a.id,
     title: a.title,
@@ -72,7 +72,8 @@ export default async function TherianPage() {
     category: a.category,
     unlocked: a.check(achievementUser),
     claimed: claimed.includes(a.id),
-  }))
+    progress: a.getProgress ? a.getProgress(achievementUser) : null,
+  })).sort((a, b) => Number(a.claimed) - Number(b.claimed))
 
   return (
     <div className="min-h-screen bg-[#08080F] relative">

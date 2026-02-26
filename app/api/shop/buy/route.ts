@@ -146,18 +146,28 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  let slotAchievementClaimed: string | null = null
+
   if (item.type === 'slot') {
     if (user.therianSlots >= 8) {
       return NextResponse.json({ error: 'MAX_SLOTS_REACHED' }, { status: 400 })
     }
-    await db.user.update({
+    // Check if en_aventura achievement is already claimed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dba = db as any
+    const u2 = await dba.user.findUnique({
       where: { id: session.user.id },
-      data: { therianSlots: { increment: 1 } },
-    })
+      select: { claimedAchievements: true },
+    }) as { claimedAchievements: string } | null
+    const prevClaimed: string[] = JSON.parse(u2?.claimedAchievements || '[]')
+    if (!prevClaimed.includes('en_aventura')) {
+      prevClaimed.push('en_aventura')
+      slotAchievementClaimed = JSON.stringify(prevClaimed)
+    }
   }
 
   // Deducir currency — build data explicitly so it's never an empty object
-  const deductData: { gold?: { decrement: number }; essence?: { decrement: number } } = {}
+  const deductData: Record<string, unknown> = {}
   if (item.costGold > 0) deductData.gold = { decrement: item.costGold }
   if (item.costCoin > 0) deductData.essence = { decrement: item.costCoin }
 
@@ -165,7 +175,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ITEM_HAS_NO_COST' }, { status: 500 })
   }
 
-  const updatedUser = await db.user.update({
+  if (item.type === 'slot') {
+    deductData.therianSlots = { increment: 1 }
+    if (slotAchievementClaimed) {
+      deductData.claimedAchievements = slotAchievementClaimed
+      deductData.gold = { increment: 500 }
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updatedUser = await (db as any).user.update({
     where: { id: session.user.id },
     data: deductData,
     select: { gold: true, essence: true, therianSlots: true },
@@ -179,5 +198,6 @@ export async function POST(req: NextRequest) {
       therianSlots: updatedUser.therianSlots,
     },
     ...(updatedTherian ? { updatedTherian } : {}),
+    ...(slotAchievementClaimed ? { achievementUnlocked: { id: 'en_aventura', title: 'En Aventura', rewardLabel: '🪙 +500 Oro' } } : {}),
   })
 }

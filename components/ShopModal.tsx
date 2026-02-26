@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import type { TherianDTO } from '@/lib/therian-dto'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
 import { EGGS } from '@/lib/items/eggs'
@@ -15,23 +16,23 @@ interface Wallet {
 interface Props {
   therian: TherianDTO
   wallet: Wallet
+  initialTab?: Tab
+  highlightItem?: string
   onClose: () => void
   onPurchase: (newWallet: Wallet, updatedTherian?: TherianDTO) => void
 }
 
 type Tab = 'gold' | 'coin'
 
-const EXCHANGE_RATE = 200
-
-export default function ShopModal({ therian, wallet, onClose, onPurchase }: Props) {
-  const [tab, setTab] = useState<Tab>('gold')
+export default function ShopModal({ therian, wallet, initialTab = 'gold', highlightItem, onClose, onPurchase }: Props) {
+  const router = useRouter()
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [renameInput, setRenameInput] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [exchanging, setExchanging] = useState(false)
-  const [exchangeQty, setExchangeQty] = useState(1)
   const [eggQty, setEggQty] = useState<Record<string, number>>({})
+  const [achievementUnlocked, setAchievementUnlocked] = useState<{ title: string; rewardLabel: string } | null>(null)
 
   const goldItems = SHOP_ITEMS.filter(i => i.costGold > 0)
   const coinItems = SHOP_ITEMS.filter(i => i.costCoin > 0)
@@ -83,6 +84,7 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
       setRenameInput('')
       window.dispatchEvent(new Event('inventory-updated'))
       onPurchase(data.newBalance, data.updatedTherian)
+      if (data.achievementUnlocked) setAchievementUnlocked(data.achievementUnlocked)
     } catch {
       setError('Error de conexión.')
     } finally {
@@ -90,32 +92,8 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
     }
   }
 
-  async function handleExchange() {
-    setError(null)
-    setExchanging(true)
-    const amount = exchangeQty * EXCHANGE_RATE
-    try {
-      const res = await fetch('/api/wallet/exchange', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error === 'INSUFFICIENT_ESSENCIA'
-          ? `Necesitas ${amount.toLocaleString('es-AR')} GOLD para cambiar.`
-          : 'Error al cambiar.')
-        return
-      }
-      onPurchase({ gold: data.gold, essence: data.essence, therianSlots: wallet.therianSlots })
-    } catch {
-      setError('Error de conexión.')
-    } finally {
-      setExchanging(false)
-    }
-  }
-
   return createPortal(
+    <>
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
       onClick={onClose}
@@ -148,44 +126,6 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
               <span className="font-semibold">{wallet.essence.toLocaleString('es-AR')} ESENCIA</span>
             </span>
           </div>
-
-          {/* Exchange */}
-          {(() => {
-            const maxQty = Math.max(1, Math.floor(wallet.gold / EXCHANGE_RATE))
-            const clampedQty = Math.min(exchangeQty, maxQty)
-            const totalGold = clampedQty * EXCHANGE_RATE
-            const canExchange = wallet.gold >= EXCHANGE_RATE
-            return (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center rounded-lg border border-white/10 bg-white/5 overflow-hidden">
-                  <button
-                    onClick={() => setExchangeQty(q => Math.max(1, q - 1))}
-                    disabled={exchangeQty <= 1 || !canExchange}
-                    className="px-2.5 py-2 text-sm text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    −
-                  </button>
-                  <span className="w-8 text-center text-xs font-mono font-semibold text-white/80">{clampedQty}</span>
-                  <button
-                    onClick={() => setExchangeQty(q => Math.min(maxQty, q + 1))}
-                    disabled={clampedQty >= maxQty || !canExchange}
-                    className="px-2.5 py-2 text-sm text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    +
-                  </button>
-                </div>
-                <button
-                  onClick={handleExchange}
-                  disabled={exchanging || !canExchange}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  {exchanging
-                    ? '⏳ Canjeando...'
-                    : `🪙 ${totalGold.toLocaleString('es-AR')} GOLD → 💎 ${clampedQty} ESENCIA`}
-                </button>
-              </div>
-            )
-          })()}
 
           {/* Tabs */}
           <div className="flex gap-1 mt-3">
@@ -231,10 +171,15 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
               ? wallet.gold >= item.costGold
               : wallet.essence >= item.costCoin
 
+            const isHighlighted = item.id === highlightItem
             return (
               <div
                 key={item.id}
-                className="rounded-xl border border-white/5 bg-white/3 p-4 space-y-2"
+                className={`rounded-xl border p-4 space-y-2 ${
+                  isHighlighted
+                    ? 'border-amber-400/70 bg-amber-500/8 shadow-[0_0_18px_rgba(245,158,11,0.35)] animate-pulse'
+                    : 'border-white/5 bg-white/3'
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -354,7 +299,35 @@ export default function ShopModal({ therian, wallet, onClose, onPurchase }: Prop
           )}
         </div>
       </div>
-    </div>,
+    </div>
+
+    {achievementUnlocked && (
+      <div
+        className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        onClick={() => { setAchievementUnlocked(null); router.refresh() }}
+      >
+        <div
+          className="relative bg-[#13131F] border border-amber-500/40 rounded-2xl p-8 w-full max-w-xs text-center shadow-[0_0_60px_rgba(245,158,11,0.2)] space-y-4"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="text-5xl">🏆</div>
+          <div>
+            <p className="text-amber-400 text-[10px] uppercase tracking-widest font-semibold mb-1">Logro desbloqueado</p>
+            <h2 className="text-white font-bold text-xl">{achievementUnlocked.title}</h2>
+          </div>
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-4 py-3">
+            <p className="text-amber-300 font-semibold text-sm">{achievementUnlocked.rewardLabel}</p>
+          </div>
+          <button
+            onClick={() => { setAchievementUnlocked(null); router.refresh() }}
+            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm transition-colors"
+          >
+            ¡Genial!
+          </button>
+        </div>
+      </div>
+    )}
+    </>,
     document.body
   )
 }

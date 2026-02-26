@@ -39,7 +39,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     emoji: '👑',
     description: 'Una corona digna de la realeza Therian.',
     costGold: 0,
-    costCoin: 3,
+    costCoin: 6,
     type: 'cosmetic',
     accessoryId: 'crown',
     slot: 'cabeza',
@@ -50,7 +50,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     emoji: '🌟',
     description: 'Desbloquea un segundo Therian para adoptar.',
     costGold: 0,
-    costCoin: 5,
+    costCoin: 10,
     type: 'slot',
   },
 

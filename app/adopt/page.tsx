@@ -55,19 +55,22 @@ export default function AdoptPage() {
       {/* Fondo */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-purple-900/8 blur-[150px]"/>
-        {Array.from({ length: 60 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-white"
-            style={{
-              width: Math.random() * 2 + 1 + 'px',
-              height: Math.random() * 2 + 1 + 'px',
-              top: Math.random() * 100 + '%',
-              left: Math.random() * 100 + '%',
-              opacity: Math.random() * 0.4 + 0.05,
-            }}
-          />
-        ))}
+        {Array.from({ length: 60 }).map((_, i) => {
+          const r = (s: number) => { const x = Math.sin(i * 7 + s) * 10000; return x - Math.floor(x) }
+          return (
+            <div
+              key={i}
+              className="absolute rounded-full bg-white"
+              style={{
+                width: r(1) * 2 + 1 + 'px',
+                height: r(2) * 2 + 1 + 'px',
+                top: r(3) * 100 + '%',
+                left: r(4) * 100 + '%',
+                opacity: r(5) * 0.4 + 0.05,
+              }}
+            />
+          )
+        })}
       </div>
 
       <div className="relative z-10 w-full max-w-md mx-4">
@@ -75,12 +78,14 @@ export default function AdoptPage() {
         {phase === 'idle' && (
           <div className="text-center space-y-8">
             <div>
-              <button
-                onClick={() => router.back()}
-                className="text-white/35 hover:text-white/60 text-sm transition-colors mb-4 block text-left"
-              >
-                ← Volver
-              </button>
+              {adoptInfo && adoptInfo.cost > 0 && (
+                <button
+                  onClick={() => router.back()}
+                  className="text-white/35 hover:text-white/60 text-sm transition-colors mb-4 block text-left"
+                >
+                  ← Volver
+                </button>
+              )}
               <h1 className="text-4xl font-bold text-white mb-3">Tu Therian espera</h1>
               <p className="text-[#8B84B0] text-lg leading-relaxed">
                 Hay uno ahí afuera que lleva tu nombre.<br/>

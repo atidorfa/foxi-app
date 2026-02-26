@@ -11,6 +11,7 @@ export interface AchievementEntry {
   category: string
   unlocked: boolean
   claimed: boolean
+  progress: { current: number; max: number } | null
 }
 
 interface Props {
@@ -174,6 +175,19 @@ export default function AchievementsPanel({ achievements }: Props) {
                         <p className={`text-[11px] mt-0.5 font-mono ${ach.claimed ? 'text-white/20' : 'text-amber-400/70'}`}>
                           {ach.rewardLabel}
                         </p>
+                        {ach.progress && (
+                          <div className="mt-0.5 space-y-0.5">
+                            <div className="w-full h-[3px] rounded-full bg-white/8 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${ach.claimed ? 'bg-white/20' : 'bg-amber-400'}`}
+                                style={{ width: `${Math.min(100, Math.round((ach.progress.current / ach.progress.max) * 100))}%` }}
+                              />
+                            </div>
+                            <span className={`text-[10px] font-mono ${ach.claimed ? 'text-white/20' : 'text-white/35'}`}>
+                              {ach.progress.current.toLocaleString('es-AR')} / {ach.progress.max.toLocaleString('es-AR')}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {canClaim && (

@@ -8,7 +8,7 @@ import type { BattleResult } from '@/lib/battle/engine'
 import TherianAvatar from './TherianAvatar'
 import StatBar from './StatBar'
 import RarityBadge from './RarityBadge'
-import DailyActionButtons from './DailyActionButtons'
+import DailyActionButtons, { type ActionResultData } from './DailyActionButtons'
 import FlavorText from './FlavorText'
 import BattleArena from './BattleArena'
 import { RUNES, type Rune } from '@/lib/catalogs/runes'
@@ -20,6 +20,7 @@ import { ABILITIES, INNATE_BY_ARCHETYPE } from '@/lib/pvp/abilities'
 interface Props {
   therian: TherianDTO
   rank?: number
+  slots?: number
 }
 
 const STAT_CONFIG = [
@@ -56,7 +57,7 @@ const RARITY_GLOW: Record<string, string> = {
   MYTHIC:    'border-red-500/60 shadow-[0_0_60px_rgba(239,68,68,0.25),0_0_120px_rgba(239,68,68,0.1)]',
 }
 
-export default function TherianCard({ therian: initialTherian, rank }: Props) {
+export default function TherianCard({ therian: initialTherian, rank, slots = 1 }: Props) {
   const router = useRouter()
   const [therian, setTherian] = useState(initialTherian)
 
@@ -435,42 +436,29 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
     }
   }
 
-  const handleAction = async (actionType: string) => {
+  const handleSpinStart = () => {
     setError(null)
     setNarrative(null)
     setLastDelta(null)
+    setGoldEarned(null)
+  }
 
-    try {
-      const res = await fetch('/api/therian/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action_type: actionType, therianId: therian.id }),
-      })
+  const handleActionResult = (data: ActionResultData) => {
+    setTherian(data.therian)
+    setNarrative(data.narrative)
+    setLastDelta(data.delta)
+    if (data.goldEarned) {
+      setGoldEarned(data.goldEarned)
+      window.dispatchEvent(new CustomEvent('wallet-update'))
+    }
+    window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.therian }))
+    router.refresh()
+  }
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        if (res.status === 429) {
-          setError(data.message ?? 'Tu Therian necesita descansar.')
-          setTherian(prev => ({ ...prev, canAct: false, nextActionAt: data.nextActionAt }))
-        } else {
-          setError('Algo salió mal. Intenta de nuevo.')
-        }
-        return
-      }
-
-      setTherian(data.therian)
-      setNarrative(data.narrative)
-      setLastDelta(data.delta)
-      if (data.goldEarned) {
-        setGoldEarned(data.goldEarned)
-        window.dispatchEvent(new CustomEvent('wallet-update'))
-      }
-      window.dispatchEvent(new CustomEvent('therian-updated', { detail: data.therian }))
-      // Refresh server components (UserCard) to show updated level/xp
-      router.refresh()
-    } catch {
-      setError('Error de conexión.')
+  const handleActionError = (err: string, nextActionAt?: string) => {
+    setError(err)
+    if (nextActionAt) {
+      setTherian(prev => ({ ...prev, canAct: false, nextActionAt }))
     }
   }
 
@@ -795,11 +783,17 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
 
           {/* Col 2 fila 2: Capsular */}
           <button
-            onClick={() => { setShowCapsuleConfirm(true); setCapsuleError(null) }}
-            className="rounded-lg border border-purple-500/20 bg-purple-500/5 px-3 py-2 text-center hover:bg-purple-500/10 hover:border-purple-500/30 transition-colors"
+            onClick={() => { if (slots >= 8) { setShowCapsuleConfirm(true); setCapsuleError(null) } }}
+            disabled={slots < 8}
+            title={slots < 8 ? 'Necesitas 8 slots de Therian para capsular' : undefined}
+            className={`rounded-lg border px-3 py-2 text-center transition-colors ${
+              slots >= 8
+                ? 'border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/30'
+                : 'border-white/8 bg-white/3 cursor-not-allowed opacity-40'
+            }`}
           >
-            <p className="text-purple-300 text-xs font-semibold leading-none mb-0.5">💊 Capsular</p>
-            <p className="text-purple-300/50 text-xs leading-none">Guardar</p>
+            <p className={`text-xs font-semibold leading-none mb-0.5 ${slots >= 8 ? 'text-purple-300' : 'text-white/30'}`}>💊 Capsular</p>
+            <p className={`text-xs leading-none ${slots >= 8 ? 'text-purple-300/50' : 'text-white/20'}`}>{slots >= 8 ? 'Guardar' : '🔒 Bloqueado'}</p>
           </button>
         </div>
 
@@ -1353,7 +1347,7 @@ export default function TherianCard({ therian: initialTherian, rank }: Props) {
               </div>
             )}
 
-            <DailyActionButtons therian={therian} onAction={handleAction} />
+            <DailyActionButtons therian={therian} onSpinStart={handleSpinStart} onAction={handleActionResult} onError={handleActionError} />
 
             {narrative && <FlavorText text={narrative} key={narrative} />}
 
