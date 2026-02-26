@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { TherianDTO } from '@/lib/therian-dto'
-import { SHOP_ITEMS } from '@/lib/shop/catalog'
+import { SHOP_ITEMS, getSlotCost } from '@/lib/shop/catalog'
 import { EGGS } from '@/lib/items/eggs'
 
 interface Wallet {
@@ -163,13 +163,14 @@ export default function ShopModal({ therian, wallet, initialTab = 'gold', highli
               ? wallet.therianSlots >= 8
               : false
             const isLoadingThis = loading === item.id
-            const cost = item.costGold > 0 ? item.costGold : item.costCoin
+            const effectiveCoinCost = item.type === 'slot' ? getSlotCost(wallet.therianSlots) : item.costCoin
+            const cost = item.costGold > 0 ? item.costGold : effectiveCoinCost
             const costLabel = item.costGold > 0
               ? `${cost.toLocaleString('es-AR')} 🪙`
               : `${cost} 💎`
             const canAfford = item.costGold > 0
               ? wallet.gold >= item.costGold
-              : wallet.essence >= item.costCoin
+              : wallet.essence >= effectiveCoinCost
 
             const isHighlighted = item.id === highlightItem
             return (

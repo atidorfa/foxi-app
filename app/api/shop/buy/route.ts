@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
-import { getShopItem } from '@/lib/shop/catalog'
+import { getShopItem, getSlotCost } from '@/lib/shop/catalog'
 import { EGG_BY_ID } from '@/lib/items/eggs'
 import { toTherianDTO } from '@/lib/therian-dto'
 import { z } from 'zod'
@@ -96,6 +96,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'USER_NOT_FOUND' }, { status: 404 })
   }
 
+  // Dynamic cost for slot purchases
+  const effectiveCostCoin = item.type === 'slot' ? getSlotCost(user.therianSlots) : item.costCoin
+
   // Validar saldo
   if (item.costGold > 0 && user.gold < item.costGold) {
     return NextResponse.json(
@@ -103,9 +106,9 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     )
   }
-  if (item.costCoin > 0 && user.essence < item.costCoin) {
+  if (effectiveCostCoin > 0 && user.essence < effectiveCostCoin) {
     return NextResponse.json(
-      { error: 'INSUFFICIENT_COIN', available: user.essence, required: item.costCoin },
+      { error: 'INSUFFICIENT_COIN', available: user.essence, required: effectiveCostCoin },
       { status: 400 }
     )
   }
@@ -169,7 +172,7 @@ export async function POST(req: NextRequest) {
   // Deducir currency — build data explicitly so it's never an empty object
   const deductData: Record<string, unknown> = {}
   if (item.costGold > 0) deductData.gold = { decrement: item.costGold }
-  if (item.costCoin > 0) deductData.essence = { decrement: item.costCoin }
+  if (effectiveCostCoin > 0) deductData.essence = { decrement: effectiveCostCoin }
 
   if (Object.keys(deductData).length === 0) {
     return NextResponse.json({ error: 'ITEM_HAS_NO_COST' }, { status: 500 })

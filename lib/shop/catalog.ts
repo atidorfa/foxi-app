@@ -48,7 +48,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     id: 'slot_extra',
     name: 'Slot Extra de Therian',
     emoji: '🌟',
-    description: 'Desbloquea un segundo Therian para adoptar.',
+    description: 'Desbloquea otro slot para adoptar.',
     costGold: 0,
     costCoin: 10,
     type: 'slot',
@@ -89,4 +89,12 @@ export const SHOP_ITEMS: ShopItem[] = [
 
 export function getShopItem(id: string): ShopItem | undefined {
   return SHOP_ITEMS.find(item => item.id === id)
+}
+
+/**
+ * Dynamic slot cost based on current slot count.
+ * Slot 4 → 10, slot 5 → 20, slot 6 → 30, slot 7 → 40, slot 8 → 50.
+ */
+export function getSlotCost(currentSlots: number): number {
+  return (currentSlots - 2) * 10
 }

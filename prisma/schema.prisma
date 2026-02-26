@@ -24,7 +24,9 @@ model User {
   claimedAchievements String             @default("[]") @db.Text
   loginStreak         Int                @default(0)
   lastLoginDate       String             @default("") @db.Text
-  claimedMissions     String             @default("[]") @db.Text
+  claimedMissions       String             @default("[]") @db.Text
+  lastPassiveClaim      DateTime?
+  completedCollections  String             @default("[]") @db.Text
   therians           Therian[]
   verificationTokens VerificationToken[]
   inventoryItems     InventoryItem[]
