@@ -143,6 +143,12 @@ export default function PassiveIncomeCard() {
     if (n >= 0.01) return n.toFixed(4)
     return n.toFixed(6)
   }
+  function toPerHour(goldPer24h: number): string {
+    const val = goldPer24h / 24
+    if (val >= 100) return val.toFixed(0)
+    if (val >= 1)   return val.toFixed(1)
+    return val.toFixed(2)
+  }
   const intervalRef    = useRef<ReturnType<typeof setInterval> | null>(null)
   const goldIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fetchedAtRef   = useRef<number>(0)
@@ -231,8 +237,8 @@ export default function PassiveIncomeCard() {
             {hasIncome ? (
               <>
                 <p className="text-white/60 text-xs">
-                  Generando: <span className="text-amber-300 font-semibold">+{totalPer24h} 🪙</span>
-                  <span className="text-white/40">/24hs</span>
+                  Generando: <span className="text-amber-300 font-semibold">+{toPerHour(totalPer24h)} 🪙</span>
+                  <span className="text-white/40"> / h</span>
                 </p>
                 <p className="text-white/60 text-xs">
                   Oro acumulado: <span className="text-amber-300 font-semibold font-mono">{liveGold === null ? '···' : formatGold(liveGold)} 🪙</span>
@@ -267,8 +273,8 @@ export default function PassiveIncomeCard() {
                   {hasIncome ? (
                     <>
                       <p className="text-white font-semibold text-sm">
-                        <span className="text-amber-300">+{totalPer24h} 🪙</span>
-                        <span className="text-white/40 text-xs font-normal">/24hs en total</span>
+                        <span className="text-amber-300">+{toPerHour(totalPer24h)} 🪙</span>
+                        <span className="text-white/40 text-xs font-normal">/1h en total</span>
                       </p>
                       <p className="text-white/50 text-xs">
                         Oro acumulado: <span className="text-amber-300 font-semibold font-mono">{liveGold === null ? '···' : formatGold(liveGold)} 🪙</span>
@@ -321,11 +327,11 @@ export default function PassiveIncomeCard() {
                         <span className="text-[10px] font-bold uppercase tracking-wide text-yellow-400">Nivel {data.levelBonus.level}</span>
                       </div>
                       <p className="text-[10px] text-white/35 font-mono">
-                        Nivel {data.levelBonus.level} × +100 🪙
+                        Nivel {data.levelBonus.level} × +{toPerHour(100)} 🪙/h
                       </p>
                     </div>
                     <div className="flex-shrink-0 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold border-yellow-500/40 bg-yellow-500/10 text-yellow-400">
-                      +{data.levelBonus.goldPer24h} 🪙
+                      +{toPerHour(data.levelBonus.goldPer24h)} 🪙/h
                     </div>
                   </div>
                 )}
@@ -347,7 +353,7 @@ export default function PassiveIncomeCard() {
                         </div>
                         {m.active && m.count > 1 && (
                           <p className="text-[10px] text-white/35 font-mono">
-                            {m.count} therians × +{m.goldPer24h} 🪙
+                            {m.count} therians × +{toPerHour(m.goldPer24h)} 🪙/h
                           </p>
                         )}
                         {!m.active && (
@@ -356,7 +362,7 @@ export default function PassiveIncomeCard() {
                       </div>
                       {m.active ? (
                         <div className={`flex-shrink-0 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold ${bc} ${bg} ${tc}`}>
-                          +{m.effectiveGoldPer24h} 🪙
+                          +{toPerHour(m.effectiveGoldPer24h)} 🪙/h
                         </div>
                       ) : null}
                     </div>
@@ -393,12 +399,12 @@ export default function PassiveIncomeCard() {
                           </div>
                         )}
                         <p className={`text-[11px] font-mono font-semibold ${tc}`}>
-                          {m.active ? `+${m.goldPer24h} 🪙` : `+${m.goldPer24h} 🪙 al completar`}
+                          {m.active ? `+${toPerHour(m.goldPer24h)} 🪙/h` : `+${toPerHour(m.goldPer24h)} 🪙/h al completar`}
                         </p>
                       </div>
                       {m.active && (
                         <div className={`flex-shrink-0 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold ${bc} ${bg} ${tc}`}>
-                          +{m.goldPer24h} 🪙
+                          +{toPerHour(m.goldPer24h)} 🪙/h
                         </div>
                       )}
                     </div>
@@ -436,12 +442,12 @@ export default function PassiveIncomeCard() {
                           </div>
                         )}
                         <p className={`text-[11px] font-mono font-semibold ${m.active ? tc : 'text-white/30'}`}>
-                          {m.active ? `+${m.goldPer24h} 🪙` : `+${m.goldPer24h} 🪙 al completar`}
+                          {m.active ? `+${toPerHour(m.goldPer24h)} 🪙/h` : `+${toPerHour(m.goldPer24h)} 🪙/h al completar`}
                         </p>
                       </div>
                       {m.active && (
                         <div className={`flex-shrink-0 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold ${bc} ${bg} ${tc}`}>
-                          +{m.goldPer24h} 🪙
+                          +{toPerHour(m.goldPer24h)} 🪙/h
                         </div>
                       )}
                     </div>

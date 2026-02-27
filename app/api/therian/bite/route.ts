@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { toTherianDTO } from '@/lib/therian-dto'
 import { calculateBattle } from '@/lib/battle/engine'
 
-const COOLDOWN_MS = 5 * 60 * 1000
+const COOLDOWN_MS = 3 * 60 * 1000
 
 const BodySchema = z.object({
   target_name: z.string().min(1),

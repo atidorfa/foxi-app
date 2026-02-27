@@ -49,12 +49,12 @@ function availableAt(isoString: string | null): string {
 }
 
 const RARITY_GLOW: Record<string, string> = {
-  COMMON:    'border-white/10',
-  UNCOMMON:  'border-emerald-500/30 shadow-[0_0_20px_rgba(52,211,153,0.1)]',
-  RARE:      'border-blue-500/30 shadow-[0_0_30px_rgba(96,165,250,0.1)]',
-  EPIC:      'border-purple-500/40 shadow-[0_0_40px_rgba(192,132,252,0.15)]',
-  LEGENDARY: 'border-amber-500/50 shadow-[0_0_50px_rgba(252,211,77,0.2),0_0_100px_rgba(252,211,77,0.05)]',
-  MYTHIC:    'border-red-500/60 shadow-[0_0_60px_rgba(239,68,68,0.25),0_0_120px_rgba(239,68,68,0.1)]',
+  COMMON:    'border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_20px_rgba(255,255,255,0.05)]',
+  UNCOMMON:  'border-emerald-400/60 shadow-[0_0_0_1px_rgba(52,211,153,0.25),0_0_35px_rgba(52,211,153,0.2),0_0_70px_rgba(52,211,153,0.08)]',
+  RARE:      'border-blue-400/65 shadow-[0_0_0_1px_rgba(96,165,250,0.3),0_0_45px_rgba(96,165,250,0.22),0_0_90px_rgba(96,165,250,0.08)]',
+  EPIC:      'border-purple-400/75 shadow-[0_0_0_1px_rgba(192,132,252,0.4),0_0_55px_rgba(192,132,252,0.3),0_0_110px_rgba(192,132,252,0.12)]',
+  LEGENDARY: 'border-amber-400/85 shadow-[0_0_0_1px_rgba(252,211,77,0.5),0_0_60px_rgba(252,211,77,0.38),0_0_120px_rgba(252,211,77,0.15),0_0_200px_rgba(252,211,77,0.06)]',
+  MYTHIC:    'border-red-400/90 shadow-[0_0_0_1px_rgba(239,68,68,0.6),0_0_70px_rgba(239,68,68,0.45),0_0_140px_rgba(239,68,68,0.2),0_0_220px_rgba(239,68,68,0.08)]',
 }
 
 export default function TherianCard({ therian: initialTherian, rank, slots = 1 }: Props) {
@@ -715,7 +715,7 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
 
       {/* Main Card (Front) */}
       <div className={`
-        relative z-10 w-full rounded-2xl border bg-[#13131F]
+        relative z-10 w-full rounded-2xl border-2 bg-[#13131F]
         ${glowClass} transition-shadow duration-500 shadow-2xl
       `}>
         {/* Fondo decorativo aislante de overflow */}
