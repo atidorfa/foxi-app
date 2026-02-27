@@ -9,8 +9,8 @@ type ClawSideFn = (c: AccColors, side: 'L' | 'R') => React.ReactElement | null
 // ─────────────────────────────────────────────────────────────────────────────
 // ANCHOR POINTS — contrato del cuerpo neutro (viewBox 0 0 300 300)
 // SVG form:  EAR_L≈(118,78)  EAR_R≈(182,78)  MUZZLE=(150,120)
-//            TAIL_BASE≈(205,195)  PAW_FL=(72,201)  PAW_FR=(228,201)
-//            PAW_BL=(115,282)    PAW_BR=(185,282)
+//            TAIL_BASE≈(205,224)  PAW_FL=(68,240)  PAW_FR=(232,240)
+//            PAW_BL=(114,296)    PAW_BR=(186,296)
 // Chibi form: EAR_L≈(104,96)  EAR_R≈(196,96)  MUZZLE=(150,118)
 //            TAIL_BASE≈(178,202)  PAW_FL=(109,240)  PAW_FR=(191,240)
 //            PAW_BL=(134,261)    PAW_BR=(166,261)
@@ -18,7 +18,7 @@ type ClawSideFn = (c: AccColors, side: 'L' | 'R') => React.ReactElement | null
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SVG FORM (Level 1-2, viewBox 0 0 300 300)
-// Head center ~(150,100), HEAD_SHAPE y=55–145. Body y=90–245.
+// Head center ~(150,100), HEAD_SHAPE y=50–154. Body y=148–274 (flat top).
 // ═════════════════════════════════════════════════════════════════════════════
 export const ACC_VISUAL_SVG: Record<string, AccVisualFn> = {
 
@@ -218,63 +218,63 @@ export const ACC_VISUAL_SVG: Record<string, AccVisualFn> = {
 
   tail_wolf: ({ primary, secondary, accent }) => (
     <>
-      {/* Capa base — voluminosa */}
-      <path d="M196 196 Q252 178 276 218 Q286 248 260 258 Q230 268 210 234 Q196 216 196 196 Z"
+      {/* Capa base — voluminosa, sale del rump derecho del cuerpo */}
+      <path d="M200 228 Q256 206 278 242 Q290 270 264 278 Q234 288 214 256 Q200 244 200 228 Z"
             fill={primary} stroke="rgba(0,0,0,0.08)" strokeWidth="0.5"/>
-      {/* Capa interior más clara */}
-      <path d="M200 202 Q248 188 268 222 Q276 246 254 254 Q230 262 214 236 Q202 220 200 202 Z"
-            fill={secondary} opacity="0.5"/>
-      {/* Punta accent — toque final */}
-      <ellipse cx="256" cy="252" rx="14" ry="9" fill={accent} opacity="0.7" transform="rotate(-15,256,252)"/>
+      {/* Interior más claro */}
+      <path d="M204 234 Q254 216 272 246 Q282 268 260 274 Q234 282 218 254 Q204 244 204 234 Z"
+            fill={secondary} opacity="0.55"/>
+      {/* Punta accent */}
+      <ellipse cx="260" cy="270" rx="15" ry="10" fill={accent} opacity="0.72" transform="rotate(-18,260,270)"/>
     </>
   ),
 
   tail_fox: ({ primary, secondary, accent }) => (
     <>
-      {/* Enorme y esponjosa — LA cola icónica */}
-      <path d="M192 196 C212 168, 272 160, 292 212 C306 256, 270 292, 238 284 C206 276, 188 248, 192 196 Z"
+      {/* Enorme y esponjosa — la más icónica, sale del rump */}
+      <path d="M200 226 C218 200 262 192 280 228 C296 258 276 288 250 286 C222 284 200 260 200 226 Z"
             fill={primary} stroke="rgba(0,0,0,0.06)" strokeWidth="0.5"/>
-      {/* Zona interior secondary */}
-      <path d="M196 204 C214 180, 268 174, 284 218 C296 256, 264 286, 238 278 C212 270, 198 248, 196 204 Z"
-            fill={secondary} opacity="0.55"/>
-      {/* Punta blanca/accent — característica del zorro */}
-      <ellipse cx="250" cy="282" rx="20" ry="12" fill={accent} opacity="0.92" transform="rotate(-8,250,282)"/>
-      <ellipse cx="238" cy="274" rx="24" ry="14" fill={secondary} opacity="0.4" transform="rotate(-12,238,274)"/>
+      {/* Interior secondary */}
+      <path d="M204 234 C220 212 258 206 272 234 C284 260 268 282 250 280 C228 278 206 258 204 234 Z"
+            fill={secondary} opacity="0.58"/>
+      {/* Punta accent — característica del zorro */}
+      <ellipse cx="250" cy="280" rx="24" ry="15" fill={accent} opacity="0.92"/>
+      <ellipse cx="238" cy="272" rx="26" ry="14" fill={secondary} opacity="0.38"/>
     </>
   ),
 
   tail_cat: ({ primary, secondary, accent }) => (
     <>
       {/* Larga y sinuosa */}
-      <path d="M196 204 Q232 184 258 198 Q278 212 274 238 Q270 258 252 248 Q234 238 216 212 Q204 208 196 204 Z"
+      <path d="M200 232 Q234 212 260 226 Q280 240 276 264 Q272 284 252 274 Q232 264 216 238 Q204 234 200 232 Z"
             fill={primary} stroke="rgba(0,0,0,0.06)" strokeWidth="0.5"/>
       {/* Anillo de secondary en el tercio final */}
-      <ellipse cx="248" cy="236" rx="10" ry="14" fill={secondary} opacity="0.45" transform="rotate(20,248,236)"/>
+      <ellipse cx="250" cy="258" rx="11" ry="15" fill={secondary} opacity="0.48" transform="rotate(20,250,258)"/>
       {/* Punta */}
-      <ellipse cx="256" cy="246" rx="8" ry="6" fill={accent} opacity="0.55" transform="rotate(15,256,246)"/>
+      <ellipse cx="258" cy="268" rx="9" ry="7" fill={accent} opacity="0.58" transform="rotate(15,258,268)"/>
     </>
   ),
 
   tail_crow: ({ primary, secondary, accent }) => (
     <>
-      {/* 4 plumas en abanico con nervio central visible */}
-      <path d="M194 212 Q220 194 244 208 Q238 226 214 218 Z" fill={primary} stroke="rgba(0,0,0,0.12)" strokeWidth="0.5"/>
-      <line x1="194" y1="212" x2="240" y2="208" stroke={secondary} strokeWidth="0.7" opacity="0.5"/>
-      <path d="M194 215 Q224 200 250 220 Q242 238 216 226 Z" fill={primary} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" opacity="0.9"/>
-      <line x1="194" y1="215" x2="246" y2="220" stroke={secondary} strokeWidth="0.7" opacity="0.5"/>
-      <path d="M194 218 Q222 210 244 234 Q234 250 212 234 Z" fill={primary} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" opacity="0.8"/>
-      <path d="M194 220 Q216 218 230 244 Q220 256 206 238 Z" fill={accent} stroke={primary} strokeWidth="0.5" opacity="0.75"/>
+      {/* 4 plumas caudales en abanico */}
+      <path d="M200 236 Q226 218 250 232 Q244 252 218 242 Z" fill={primary} stroke="rgba(0,0,0,0.12)" strokeWidth="0.5"/>
+      <line x1="200" y1="236" x2="246" y2="232" stroke={secondary} strokeWidth="0.8" opacity="0.5"/>
+      <path d="M200 240 Q228 224 254 244 Q246 264 220 250 Z" fill={primary} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" opacity="0.9"/>
+      <line x1="200" y1="240" x2="250" y2="244" stroke={secondary} strokeWidth="0.8" opacity="0.5"/>
+      <path d="M200 244 Q226 238 248 260 Q238 276 216 260 Z" fill={primary} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" opacity="0.8"/>
+      <path d="M200 248 Q220 246 234 270 Q222 282 208 264 Z" fill={accent} stroke={primary} strokeWidth="0.5" opacity="0.78"/>
     </>
   ),
 
   tail_deer: ({ secondary, accent }) => (
     // Cola blanca pequeña y característica
-    <ellipse cx="202" cy="216" rx="11" ry="9" fill={secondary} stroke={accent} strokeWidth="0.5" opacity="0.92"/>
+    <ellipse cx="204" cy="232" rx="14" ry="11" fill={secondary} stroke={accent} strokeWidth="0.5" opacity="0.92"/>
   ),
 
   tail_bear: ({ primary, secondary }) => (
     // Pequeñita y redondeada
-    <ellipse cx="204" cy="214" rx="9" ry="8" fill={secondary} stroke={primary} strokeWidth="0.8" opacity="0.88"/>
+    <ellipse cx="204" cy="232" rx="12" ry="11" fill={secondary} stroke={primary} strokeWidth="0.8" opacity="0.9"/>
   ),
 
   // ── OJOS (markings sobre ojos existentes) ──────────────────────────────────
@@ -341,25 +341,24 @@ export const ACC_VISUAL_SVG: Record<string, AccVisualFn> = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLAW_SIDE_SVG — garras lateralizadas para incluir DENTRO de los arm refs
-// Pata delantera izq: PAW_FL=(72,201)  |  Pata delantera der: PAW_FR=(228,201)
-// Las coordenadas son absolutas (rest pose), pero al estar dentro del arm group
-// rotan con él → correcto seguimiento de animación.
+// Pata delantera izq: PAW_FL=(68,240)  |  Pata delantera der: PAW_FR=(232,240)
+// Garras salen por debajo de la pata (y=253–275) — grandes y visibles.
 // ─────────────────────────────────────────────────────────────────────────────
 export const CLAW_SIDE_SVG: Record<string, ClawSideFn> = {
 
   claws_wolf: ({ accent }, side) => {
-    // 4 garras en forma de triángulo apuntando hacia abajo, ligeramente curvadas
-    const offsets = [-12, -4, 4, 12]
-    const cx = side === 'L' ? 72 : 228
-    const mirror = side === 'R' ? -1 : 1
+    // 4 garras anchas apuntando hacia abajo
+    const offsets = [-13, -4, 5, 14]
+    const cx = side === 'L' ? 70 : 230
+    const m  = side === 'R' ? -1 : 1
     return (
       <g>
         {offsets.map((dx, i) => {
-          const bx = cx + dx * mirror
+          const bx = cx + dx * m
           return (
             <path key={i}
-              d={`M${bx - 2},204 C${bx - 3},210 ${bx - 4},215 ${bx - 1},220 C${bx + 1},215 ${bx + 3},210 ${bx + 2},204 Z`}
-              fill={accent} opacity="0.92"/>
+              d={`M${bx - 3},257 C${bx - 5},264 ${bx - 5},271 ${bx},275 C${bx + 5},271 ${bx + 5},264 ${bx + 3},257 Z`}
+              fill={accent} opacity="0.95"/>
           )
         })}
       </g>
@@ -367,18 +366,18 @@ export const CLAW_SIDE_SVG: Record<string, ClawSideFn> = {
   },
 
   claws_fox: ({ accent }, side) => {
-    // Más delgadas y elegantes
-    const offsets = [-11, -4, 3, 10]
-    const cx = side === 'L' ? 72 : 228
-    const mirror = side === 'R' ? -1 : 1
+    // 4 garras delgadas y elegantes
+    const offsets = [-12, -4, 4, 12]
+    const cx = side === 'L' ? 70 : 230
+    const m  = side === 'R' ? -1 : 1
     return (
       <g>
         {offsets.map((dx, i) => {
-          const bx = cx + dx * mirror
+          const bx = cx + dx * m
           return (
             <path key={i}
-              d={`M${bx - 1.5},204 C${bx - 2.5},211 ${bx - 3},217 ${bx - 0.5},222 C${bx + 1},217 ${bx + 2.5},211 ${bx + 1.5},204 Z`}
-              fill={accent} opacity="0.88"/>
+              d={`M${bx - 2},257 C${bx - 4},265 ${bx - 4},272 ${bx},276 C${bx + 4},272 ${bx + 4},265 ${bx + 2},257 Z`}
+              fill={accent} opacity="0.9"/>
           )
         })}
       </g>
@@ -386,68 +385,66 @@ export const CLAW_SIDE_SVG: Record<string, ClawSideFn> = {
   },
 
   claws_cat: ({ accent }, side) => {
-    // 3 garras retráctiles — curva característica felina
-    const cx = side === 'L' ? 72 : 228
-    const m = side === 'R' ? -1 : 1
+    // 3 garras retráctiles curvadas — característica felina
+    const cx = side === 'L' ? 70 : 230
+    const m  = side === 'R' ? -1 : 1
     return (
       <g>
-        <path d={`M${cx - 10*m},204 C${cx - 13*m},210 ${cx - 13*m},216 ${cx - 10*m},220 C${cx - 8*m},216 ${cx - 8*m},210 ${cx - 8*m},204 Z`}
-              fill={accent} opacity="0.9"/>
-        <path d={`M${cx - 1*m},204 C${cx - 4*m},211 ${cx - 4*m},217 ${cx - 1*m},221 C${cx + 1*m},217 ${cx + 1*m},211 ${cx + 1*m},204 Z`}
-              fill={accent} opacity="0.9"/>
-        <path d={`M${cx + 8*m},204 C${cx + 5*m},210 ${cx + 5*m},216 ${cx + 8*m},220 C${cx + 10*m},216 ${cx + 10*m},210 ${cx + 10*m},204 Z`}
-              fill={accent} opacity="0.9"/>
+        <path d={`M${cx - 11*m},257 C${cx - 14*m},264 ${cx - 14*m},271 ${cx - 11*m},275 C${cx - 8*m},271 ${cx - 8*m},264 ${cx - 8*m},257 Z`}
+              fill={accent} opacity="0.92"/>
+        <path d={`M${cx},257 C${cx - 3*m},264 ${cx - 3*m},271 ${cx},275 C${cx + 3*m},271 ${cx + 3*m},264 ${cx + 3*m},257 Z`}
+              fill={accent} opacity="0.92"/>
+        <path d={`M${cx + 11*m},257 C${cx + 8*m},264 ${cx + 8*m},271 ${cx + 11*m},275 C${cx + 14*m},271 ${cx + 14*m},264 ${cx + 11*m},257 Z`}
+              fill={accent} opacity="0.92"/>
       </g>
     )
   },
 
   claws_crow: ({ accent }, side) => {
     // 3 garras frontales largas + 1 espolón trasero
-    const cx = side === 'L' ? 72 : 228
-    const m = side === 'R' ? -1 : 1
+    const cx = side === 'L' ? 70 : 230
+    const m  = side === 'R' ? -1 : 1
     return (
       <g>
-        {/* 3 garras frontales */}
-        <path d={`M${cx - 10*m},202 C${cx - 14*m},210 ${cx - 13*m},220 ${cx - 10*m},224 C${cx - 8*m},220 ${cx - 9*m},210 ${cx - 8*m},202 Z`}
+        <path d={`M${cx - 11*m},255 C${cx - 15*m},264 ${cx - 14*m},273 ${cx - 11*m},277 C${cx - 8*m},273 ${cx - 9*m},264 ${cx - 9*m},255 Z`}
               fill={accent} opacity="0.92"/>
-        <path d={`M${cx},202 C${cx - 2*m},212 ${cx - 1*m},222 ${cx},226 C${cx + 2*m},222 ${cx + 2*m},212 ${cx + 2*m},202 Z`}
+        <path d={`M${cx},255 C${cx - 2*m},265 ${cx - 1*m},274 ${cx},278 C${cx + 2*m},274 ${cx + 2*m},265 ${cx + 2*m},255 Z`}
               fill={accent} opacity="0.95"/>
-        <path d={`M${cx + 10*m},202 C${cx + 8*m},210 ${cx + 9*m},220 ${cx + 12*m},224 C${cx + 14*m},220 ${cx + 13*m},210 ${cx + 12*m},202 Z`}
+        <path d={`M${cx + 11*m},255 C${cx + 9*m},264 ${cx + 10*m},273 ${cx + 13*m},277 C${cx + 15*m},273 ${cx + 14*m},264 ${cx + 13*m},255 Z`}
               fill={accent} opacity="0.92"/>
-        {/* Espolón trasero */}
-        <path d={`M${cx},197 C${cx - 2*m},193 ${cx - 5*m},190 ${cx - 7*m},188 C${cx - 5*m},190 ${cx - 3*m},192 ${cx + 1},196 Z`}
+        <path d={`M${cx},250 C${cx - 2*m},246 ${cx - 5*m},242 ${cx - 8*m},240 C${cx - 5*m},242 ${cx - 2*m},246 ${cx + 2},250 Z`}
               fill={accent} opacity="0.8"/>
       </g>
     )
   },
 
   claws_deer: ({ accent }, side) => {
-    // Pezuña hendida — 2 "uñas" anchas
-    const cx = side === 'L' ? 72 : 228
-    const m = side === 'R' ? -1 : 1
+    // Pezuña hendida — 2 mitades anchas
+    const cx = side === 'L' ? 70 : 230
+    const m  = side === 'R' ? -1 : 1
     return (
       <g>
-        <path d={`M${cx - 7*m},204 L${cx - 7*m},216 Q${cx - 9*m},222 ${cx - 14*m},222`}
-              fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round"/>
-        <path d={`M${cx - 7*m},216 Q${cx - 5*m},222 ${cx},222`}
-              fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round"/>
+        <path d={`M${cx - 8*m},257 L${cx - 8*m},270 Q${cx - 11*m},278 ${cx - 16*m},278`}
+              fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round"/>
+        <path d={`M${cx - 8*m},270 Q${cx - 5*m},278 ${cx + 1*m},278`}
+              fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round"/>
       </g>
     )
   },
 
   claws_bear: ({ accent }, side) => {
     // 4 garras gruesas y poderosas
-    const offsets = [-12, -4, 4, 12]
-    const cx = side === 'L' ? 72 : 228
-    const mirror = side === 'R' ? -1 : 1
+    const offsets = [-14, -5, 4, 13]
+    const cx = side === 'L' ? 70 : 230
+    const m  = side === 'R' ? -1 : 1
     return (
       <g>
         {offsets.map((dx, i) => {
-          const bx = cx + dx * mirror
+          const bx = cx + dx * m
           return (
             <path key={i}
-              d={`M${bx - 3},204 C${bx - 4},208 ${bx - 4},213 ${bx - 1},216 C${bx + 1},213 ${bx + 4},208 ${bx + 3},204 Z`}
-              fill={accent} opacity="0.95"/>
+              d={`M${bx - 4},257 C${bx - 6},263 ${bx - 6},269 ${bx},273 C${bx + 6},269 ${bx + 6},263 ${bx + 4},257 Z`}
+              fill={accent} opacity="0.96"/>
           )
         })}
       </g>

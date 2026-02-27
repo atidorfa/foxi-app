@@ -63,11 +63,15 @@ const PATTERN_DEFS: Record<string, (_primary: string, secondary: string) => Reac
 
 const SIGNATURE_ELEMENTS: Record<string, (primary: string, accent: string) => React.ReactElement> = {
   tail_long:    (p, a) => (
-    <path d="M195 185 Q250 200 270 240 Q280 260 255 255 Q235 250 220 220 Q205 200 195 185"
-          fill={p} stroke={a} strokeWidth="1" opacity="0.9"/>
+    <path d="M200 224 C228 210 260 216 272 246 C282 270 264 282 244 276 C224 270 206 250 200 224 Z"
+          fill={p} stroke={a} strokeWidth="1" opacity="0.88"/>
   ),
   tail_fluffy:  (p, a) => (
-    <ellipse cx="220" cy="200" rx="35" ry="25" fill={p} stroke={a} strokeWidth="1" opacity="0.8" transform="rotate(30,220,200)"/>
+    <>
+      <path d="M200 226 C218 200 260 196 278 228 C294 256 274 282 250 280 C224 278 202 256 200 226 Z"
+            fill={p} stroke={a} strokeWidth="1" opacity="0.85"/>
+      <ellipse cx="248" cy="274" rx="22" ry="14" fill={a} opacity="0.38"/>
+    </>
   ),
   horns_small:  (p, a) => (
     <>
@@ -97,16 +101,19 @@ const SIGNATURE_ELEMENTS: Record<string, (primary: string, accent: string) => Re
   no_signature: () => <></>,
 }
 
-const BODY_SHAPE = "M150,90 C120,90 95,110 90,140 C85,165 88,200 95,215 C105,235 125,245 150,245 C175,245 195,235 205,215 C212,200 215,165 210,140 C205,110 180,90 150,90 Z"
-const HEAD_SHAPE = "M150,55 C125,55 105,70 100,88 C96,103 98,120 108,130 C118,140 133,145 150,145 C167,145 182,140 192,130 C202,120 204,103 200,88 C195,70 175,55 150,55 Z"
-const EAR_L = "M108 78 Q100 45 118 38 Q128 60 115 82 Z"
-const EAR_R = "M192 78 Q200 45 182 38 Q172 60 185 82 Z"
+// Cuerpo: tapa plana en y=148 (ancho completo desde el primer punto), sin cuello visible
+// La cabeza se renderiza ENCIMA y oculta la unión — no hace falta transición suave
+const BODY_SHAPE = "M96,148 L204,148 C226,148 232,164 232,186 C232,214 226,240 210,254 C196,268 174,274 150,274 C126,274 104,268 90,254 C74,240 68,214 68,186 C68,164 74,148 96,148 Z"
+// Cabeza: termina en y=154 — se superpone 6px sobre el cuerpo, unión invisible
+const HEAD_SHAPE = "M150,50 C122,50 100,68 96,92 C92,112 97,132 110,142 C122,150 136,154 150,154 C164,154 178,150 190,142 C203,132 208,112 204,92 C200,68 178,50 150,50 Z"
+const EAR_L = "M108 80 Q100 44 118 34 Q130 58 118 84 Z"
+const EAR_R = "M192 80 Q200 44 182 34 Q170 58 182 84 Z"
 
-// Pivot points: donde cada extremidad se une al cuerpo
-const L_ARM_PX = 82,  L_ARM_PY = 133  // hombro izquierdo
-const R_ARM_PX = 218, R_ARM_PY = 133  // hombro derecho
-const L_LEG_PX = 122, L_LEG_PY = 217  // cadera izquierda
-const R_LEG_PX = 178, R_LEG_PY = 217  // cadera derecha
+// Pivot points: hombros y caderas
+const L_ARM_PX = 88,  L_ARM_PY = 160  // hombro izquierdo
+const R_ARM_PX = 212, R_ARM_PY = 160  // hombro derecho
+const L_LEG_PX = 120, L_LEG_PY = 246  // cadera izquierda
+const R_LEG_PX = 180, R_LEG_PY = 246  // cadera derecha
 
 function pivotTransform(px: number, py: number, angle: number): string {
   const a = angle.toFixed(2)
@@ -258,30 +265,30 @@ export default function TherianAvatarSVG({
 
         {showLimbs && (
           <>
-            {/* Brazo izquierdo — pivot en hombro */}
+            {/* Brazo izquierdo — pivot en hombro izquierdo */}
             <g ref={lArmRef}>
-              <ellipse cx={L_ARM_PX} cy="163" rx="13" ry="40" fill={fill}/>
-              <ellipse cx="72" cy="201" rx="14" ry="11" fill={secondary} opacity="0.9"/>
+              <ellipse cx="76" cy="200" rx="17" ry="42" fill={fill}/>
+              <ellipse cx="68" cy="240" rx="21" ry="13" fill={secondary} opacity="0.9"/>
               {clawsId && CLAW_SIDE_SVG[clawsId]?.(colors, 'L')}
             </g>
 
-            {/* Brazo derecho — pivot en hombro */}
+            {/* Brazo derecho — pivot en hombro derecho */}
             <g ref={rArmRef}>
-              <ellipse cx={R_ARM_PX} cy="163" rx="13" ry="40" fill={fill}/>
-              <ellipse cx="228" cy="201" rx="14" ry="11" fill={secondary} opacity="0.9"/>
+              <ellipse cx="224" cy="200" rx="17" ry="42" fill={fill}/>
+              <ellipse cx="232" cy="240" rx="21" ry="13" fill={secondary} opacity="0.9"/>
               {clawsId && CLAW_SIDE_SVG[clawsId]?.(colors, 'R')}
             </g>
 
-            {/* Pierna izquierda — pivot en cadera */}
+            {/* Pierna izquierda — pivot en cadera izquierda */}
             <g ref={lLegRef}>
-              <ellipse cx={L_LEG_PX} cy="249" rx="19" ry="36" fill={fill}/>
-              <ellipse cx="115" cy="282" rx="21" ry="11" fill={secondary} opacity="0.9"/>
+              <ellipse cx="122" cy="272" rx="20" ry="28" fill={fill}/>
+              <ellipse cx="114" cy="296" rx="24" ry="11" fill={secondary} opacity="0.9"/>
             </g>
 
-            {/* Pierna derecha — pivot en cadera */}
+            {/* Pierna derecha — pivot en cadera derecha */}
             <g ref={rLegRef}>
-              <ellipse cx={R_LEG_PX} cy="249" rx="19" ry="36" fill={fill}/>
-              <ellipse cx="185" cy="282" rx="21" ry="11" fill={secondary} opacity="0.9"/>
+              <ellipse cx="178" cy="272" rx="20" ry="28" fill={fill}/>
+              <ellipse cx="186" cy="296" rx="24" ry="11" fill={secondary} opacity="0.9"/>
             </g>
           </>
         )}
@@ -294,8 +301,8 @@ export default function TherianAvatarSVG({
 
         {/* Cuerpo */}
         <path d={BODY_SHAPE} fill={fill}/>
-        {/* Zona ventral — área secondary característica de los animales */}
-        <ellipse cx="150" cy="178" rx="35" ry="44" fill={secondary} opacity="0.42"/>
+        {/* Zona ventral — bien dentro del cuerpo, sin sobresalir */}
+        <ellipse cx="150" cy="210" rx="20" ry="28" fill={secondary} opacity="0.38"/>
 
         {/* Patrón sobre cuerpo */}
         {PatternEl(primary, secondary)}
@@ -319,16 +326,16 @@ export default function TherianAvatarSVG({
         {/* Hocico / Nariz */}
         {hocicoId
           ? ACC_VISUAL_SVG[hocicoId]?.(colors)
-          : <ellipse cx="150" cy="120" rx="8" ry="5" fill={accent} opacity="0.9"/>
+          : <ellipse cx="150" cy="118" rx="8" ry="5" fill={accent} opacity="0.9"/>
         }
 
         {/* Ojos */}
-        <g transform="translate(120, 103)">
+        <g transform="translate(120, 100)">
           <path d={eyeShape} fill={accent}
                 filter={therian.rarity === 'LEGENDARY' ? 'url(#legendary-glow)' : undefined}/>
           <circle cx="0" cy="0" r="2" fill="white" opacity="0.8"/>
         </g>
-        <g transform="translate(180, 103)">
+        <g transform="translate(180, 100)">
           <path d={eyeShape} fill={accent}
                 filter={therian.rarity === 'LEGENDARY' ? 'url(#legendary-glow)' : undefined}/>
           <circle cx="0" cy="0" r="2" fill="white" opacity="0.8"/>
