@@ -13,6 +13,7 @@ import NavShopButton from '@/components/NavShopButton'
 import NavFusionButton from '@/components/NavFusionButton'
 import NavInventoryButton from '@/components/NavInventoryButton'
 import PassiveIncomeCard from '@/components/PassiveIncomeCard'
+import TutorialCard from '@/components/TutorialCard'
 import { ACHIEVEMENTS } from '@/lib/catalogs/achievements'
 
 export const dynamic = 'force-dynamic'
@@ -112,6 +113,11 @@ export default async function TherianPage() {
         <PassiveIncomeCard />
         <AchievementsPanel achievements={achievementEntries} />
         <MissionsPanel />
+      </div>
+
+      {/* Right panel — Tutorial */}
+      <div className="fixed top-20 right-6 z-20 hidden lg:flex flex-col gap-3">
+        <TutorialCard />
       </div>
 
       {/* Content */}

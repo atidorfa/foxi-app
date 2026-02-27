@@ -6,6 +6,13 @@ import { generateTherianWithRarity, getNextRarity } from '@/lib/generation/engin
 import { EGG_BY_ID } from '@/lib/items/eggs'
 import { assignUniqueName } from '@/lib/catalogs/names'
 import type { Rarity } from '@/lib/generation/engine'
+import {
+  PASSIVE_MISSIONS,
+  PASSIVE_COLLECTION_MISSIONS,
+  PASSIVE_TRAIT_MISSIONS,
+  computeAccumulatedGold,
+  getReferenceTime,
+} from '@/lib/catalogs/passive-missions'
 
 const FUSION_SUCCESS_RATE: Record<string, number> = {
   COMMON:    1.00,
@@ -83,6 +90,50 @@ export async function POST(req: Request) {
   const successRate = FUSION_SUCCESS_RATE[rarity] ?? 0.50
   const success = Math.random() < successRate
   const resultRarity: Rarity = success ? nextRarity : (rarity as Rarity)
+
+  // Bank accumulated passive gold before deleting therians to avoid resetting the reference time
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dba = db as any
+  const [userForPassive, allTherians] = await Promise.all([
+    dba.user.findUnique({
+      where: { id: session.user.id },
+      select: { lastPassiveClaim: true, level: true, completedCollections: true },
+    }) as Promise<{ lastPassiveClaim: Date | null; level: number; completedCollections: string } | null>,
+    db.therian.findMany({
+      where: { userId: session.user.id },
+      select: { rarity: true, createdAt: true, traitId: true },
+    }),
+  ])
+  if (userForPassive) {
+    const rarityCounts: Record<string, number> = {}
+    for (const t of allTherians) rarityCounts[t.rarity] = (rarityCounts[t.rarity] ?? 0) + 1
+    const traitCounts: Record<string, number> = {}
+    for (const t of allTherians) traitCounts[t.traitId] = (traitCounts[t.traitId] ?? 0) + 1
+    const completedIds: string[] = JSON.parse(userForPassive.completedCollections ?? '[]')
+    const completedSet = new Set(completedIds)
+    const GOLD_PER_LEVEL = 100
+    const totalGoldPer24h =
+      userForPassive.level * GOLD_PER_LEVEL +
+      PASSIVE_MISSIONS.reduce((sum, m) => sum + ((rarityCounts[m.rarity] ?? 0) * m.goldPer24h), 0) +
+      PASSIVE_COLLECTION_MISSIONS.filter((m) => completedSet.has(m.id) || (rarityCounts[m.rarity] ?? 0) >= m.required)
+        .reduce((sum, m) => sum + m.goldPer24h, 0) +
+      PASSIVE_TRAIT_MISSIONS.filter((m) => completedSet.has(m.id) || (traitCounts[m.traitId] ?? 0) >= m.required)
+        .reduce((sum, m) => sum + m.goldPer24h, 0)
+    const oldestTherian = allTherians.reduce<Date | null>((oldest, t) => {
+      if (!oldest) return t.createdAt
+      return t.createdAt < oldest ? t.createdAt : oldest
+    }, null)
+    const fusionNow = new Date()
+    const referenceTime = getReferenceTime(userForPassive.lastPassiveClaim, oldestTherian, fusionNow)
+    const goldToBank = Math.floor(computeAccumulatedGold(totalGoldPer24h, referenceTime, fusionNow))
+    await dba.user.update({
+      where: { id: session.user.id },
+      data: {
+        ...(goldToBank > 0 ? { gold: { increment: goldToBank } } : {}),
+        lastPassiveClaim: fusionNow,
+      },
+    })
+  }
 
   // Delete therians and deduct eggs atomically
   await db.$transaction([

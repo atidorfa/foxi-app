@@ -13,21 +13,21 @@ interface Props {
 }
 
 const RARITY_BORDER: Record<string, string> = {
-  COMMON:    'border-gray-500/30',
-  UNCOMMON:  'border-emerald-500/40',
-  RARE:      'border-blue-500/40',
-  EPIC:      'border-purple-500/50',
-  LEGENDARY: 'border-amber-500/60',
-  MYTHIC:    'border-red-500/60',
+  COMMON:    'border-gray-400/45 shadow-[0_0_6px_rgba(156,163,175,0.12)]',
+  UNCOMMON:  'border-emerald-400/60 shadow-[0_0_10px_rgba(52,211,153,0.18)]',
+  RARE:      'border-blue-400/65 shadow-[0_0_12px_rgba(96,165,250,0.2)]',
+  EPIC:      'border-purple-400/70 shadow-[0_0_14px_rgba(192,132,252,0.25)]',
+  LEGENDARY: 'border-amber-400/80 shadow-[0_0_18px_rgba(251,191,36,0.32)]',
+  MYTHIC:    'border-red-400/80 shadow-[0_0_18px_rgba(239,68,68,0.32)]',
 }
 
 const RARITY_BORDER_ACTIVE: Record<string, string> = {
-  COMMON:    'border-gray-400/60 shadow-[0_0_12px_rgba(156,163,175,0.2)]',
-  UNCOMMON:  'border-emerald-400/70 shadow-[0_0_14px_rgba(52,211,153,0.25)]',
-  RARE:      'border-blue-400/70 shadow-[0_0_14px_rgba(96,165,250,0.25)]',
-  EPIC:      'border-purple-400/80 shadow-[0_0_16px_rgba(192,132,252,0.3)]',
-  LEGENDARY: 'border-amber-400/90 shadow-[0_0_20px_rgba(251,191,36,0.35)]',
-  MYTHIC:    'border-red-400/90 shadow-[0_0_24px_rgba(239,68,68,0.4)]',
+  COMMON:    'border-gray-300/75 shadow-[0_0_0_1px_rgba(156,163,175,0.25),0_0_20px_rgba(156,163,175,0.3)]',
+  UNCOMMON:  'border-emerald-300/85 shadow-[0_0_0_1px_rgba(52,211,153,0.35),0_0_22px_rgba(52,211,153,0.38)]',
+  RARE:      'border-blue-300/85 shadow-[0_0_0_1px_rgba(96,165,250,0.4),0_0_22px_rgba(96,165,250,0.38)]',
+  EPIC:      'border-purple-300/90 shadow-[0_0_0_1px_rgba(192,132,252,0.5),0_0_26px_rgba(192,132,252,0.45)]',
+  LEGENDARY: 'border-amber-300/95 shadow-[0_0_0_1px_rgba(251,191,36,0.65),0_0_30px_rgba(251,191,36,0.55)]',
+  MYTHIC:    'border-red-300/95 shadow-[0_0_0_1px_rgba(239,68,68,0.65),0_0_34px_rgba(239,68,68,0.55)]',
 }
 
 const ORDER_KEY = 'therian-grid-order'
@@ -194,7 +194,7 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
                   onDrop={e => handleDrop(e, i)}
                   onDragEnd={handleDragEnd}
                   onClick={() => setActiveId(t.id)}
-                  className={`relative flex flex-col items-center justify-end gap-0 w-[96px] h-[96px] rounded-xl border bg-[#13131F] overflow-hidden transition-all cursor-grab active:cursor-grabbing select-none ${
+                  className={`relative flex flex-col items-center justify-end gap-0 w-[96px] h-[96px] rounded-xl border-2 bg-[#13131F] overflow-hidden transition-all cursor-grab active:cursor-grabbing select-none ${
                     isDragTarget
                       ? 'border-white/40 scale-105 shadow-[0_0_16px_rgba(255,255,255,0.15)]'
                       : isActive
