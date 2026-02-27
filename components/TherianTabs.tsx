@@ -147,10 +147,10 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex items-start gap-4">
       {showGrid && (
-        <div className="flex justify-center">
-          <div className="grid grid-cols-4 gap-3">
+        <div className="flex-shrink-0">
+          <div className="grid grid-cols-1 gap-3">
             {Array.from({ length: totalCells }).map((_, i) => {
               const t = sortedTherians[i]
               const isAdopt = !t
@@ -163,10 +163,10 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
                       if (hasAvailableSlot) {
                         router.push('/adopt')
                       } else {
-                        window.dispatchEvent(new CustomEvent('open-shop', { detail: { tab: 'coin', highlight: 'slot_extra' } }))
+                        window.dispatchEvent(new CustomEvent('open-shop', { detail: { tab: 'cuenta', highlight: 'slot_extra' } }))
                       }
                     }}
-                    className={`flex flex-col items-center justify-center gap-1.5 w-[80px] h-[96px] rounded-xl border border-dashed transition-all ${
+                    className={`flex flex-col items-center justify-center gap-1.5 w-[96px] h-[96px] rounded-xl border border-dashed transition-all ${
                       hasAvailableSlot
                         ? 'border-white/15 bg-white/3 hover:border-white/30 hover:bg-white/6'
                         : 'border-amber-500/20 bg-amber-500/4 hover:border-amber-500/40 hover:bg-amber-500/8'
@@ -194,7 +194,7 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
                   onDrop={e => handleDrop(e, i)}
                   onDragEnd={handleDragEnd}
                   onClick={() => setActiveId(t.id)}
-                  className={`relative flex flex-col items-center justify-end gap-0 w-[80px] h-[96px] rounded-xl border bg-[#13131F] overflow-hidden transition-all cursor-grab active:cursor-grabbing select-none ${
+                  className={`relative flex flex-col items-center justify-end gap-0 w-[96px] h-[96px] rounded-xl border bg-[#13131F] overflow-hidden transition-all cursor-grab active:cursor-grabbing select-none ${
                     isDragTarget
                       ? 'border-white/40 scale-105 shadow-[0_0_16px_rgba(255,255,255,0.15)]'
                       : isActive
@@ -208,7 +208,7 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
                       {t.canAct && (
                         <div
                           title="Acción diaria disponible"
-                          className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.9)] animate-pulse"
+                          className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_5px_rgba(74,222,128,0.9)] animate-pulse"
                         />
                       )}
                       {t.canBite && (
@@ -239,7 +239,9 @@ export default function TherianTabs({ therians, ranks, slots }: Props) {
       )}
 
       {/* TherianCard del activo */}
-      {active && <TherianCard key={active.id} therian={active} rank={ranks[active.id]} slots={slots} />}
+      <div className="flex-1 min-w-0">
+        {active && <TherianCard key={active.id} therian={active} rank={ranks[active.id]} slots={slots} />}
+      </div>
     </div>
   )
 }

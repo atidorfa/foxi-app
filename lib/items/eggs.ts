@@ -42,7 +42,7 @@ export const EGGS: EggItem[] = [
     emoji: '🥚',
     rarity: 'EPIC',
     description: 'Sustituye un slot de fusión Épico.',
-    price: 3,
+    price: 60,
     currency: 'essence',
   },
   {
@@ -51,7 +51,7 @@ export const EGGS: EggItem[] = [
     emoji: '🥚',
     rarity: 'LEGENDARY',
     description: 'Sustituye un slot de fusión Legendario.',
-    price: 10,
+    price: 240,
     currency: 'essence',
   },
 ]

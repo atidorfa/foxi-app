@@ -19,10 +19,10 @@ export default function NavShopButton({ therian: initialTherian }: Props) {
   const [showShop, setShowShop] = useState(false)
   const [wallet, setWallet] = useState<Wallet | null>(null)
   const [localTherian, setLocalTherian] = useState(initialTherian)
-  const [initialTab, setInitialTab] = useState<'gold' | 'coin'>('gold')
+  const [initialTab, setInitialTab] = useState<'huevos' | 'accesorios' | 'runas' | 'cuenta'>('accesorios')
   const [highlightItem, setHighlightItem] = useState<string | undefined>(undefined)
 
-  const openShop = (tab: 'gold' | 'coin' = 'gold', highlight?: string) => {
+  const openShop = (tab: 'huevos' | 'accesorios' | 'runas' | 'cuenta' = 'accesorios', highlight?: string) => {
     setInitialTab(tab)
     setHighlightItem(highlight)
     setShowShop(true)
@@ -36,8 +36,8 @@ export default function NavShopButton({ therian: initialTherian }: Props) {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ tab?: 'gold' | 'coin'; highlight?: string }>).detail
-      openShop(detail?.tab ?? 'gold', detail?.highlight)
+      const detail = (e as CustomEvent<{ tab?: 'huevos' | 'accesorios' | 'runas' | 'cuenta'; highlight?: string }>).detail
+      openShop(detail?.tab ?? 'accesorios', detail?.highlight)
     }
     window.addEventListener('open-shop', handler)
     return () => window.removeEventListener('open-shop', handler)

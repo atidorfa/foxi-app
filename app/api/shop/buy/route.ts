@@ -140,6 +140,35 @@ export async function POST(req: NextRequest) {
     updatedTherian = toTherianDTO(t)
   }
 
+  if (item.type === 'rune' && item.runeId) {
+    const therian = await db.therian.findFirst({ where: { userId: session.user.id, status: 'active' }, orderBy: { createdAt: 'asc' } })
+    if (!therian) return NextResponse.json({ error: 'NO_THERIAN' }, { status: 404 })
+
+    const deductRune: Record<string, unknown> = {}
+    if (item.costGold > 0) deductRune.gold = { decrement: item.costGold }
+    if (effectiveCostCoin > 0) deductRune.essence = { decrement: effectiveCostCoin }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dba = db as any
+    const [, updatedUserRune] = await dba.$transaction([
+      dba.runeInventory.upsert({
+        where: { therianId_runeId: { therianId: therian.id, runeId: item.runeId } },
+        update: { quantity: { increment: 1 } },
+        create: { therianId: therian.id, runeId: item.runeId, quantity: 1, source: 'shop' },
+      }),
+      dba.user.update({
+        where: { id: session.user.id },
+        data: deductRune,
+        select: { gold: true, essence: true, therianSlots: true },
+      }),
+    ])
+
+    return NextResponse.json({
+      success: true,
+      newBalance: { gold: updatedUserRune.gold, essence: updatedUserRune.essence, therianSlots: updatedUserRune.therianSlots },
+    })
+  }
+
   if (item.type === 'cosmetic' && item.accessoryId) {
     // Each purchase creates a unique instance: "typeId:uuid"
     // This allows the same cosmetic type to be bought multiple times (one per Therian)

@@ -24,10 +24,11 @@ export async function POST(req: NextRequest) {
     select: {
       level: true,
       xp: true,
+      therianSlots: true,
       claimedAchievements: true,
       therians: { select: { actionGains: true } },
     },
-  }) as { level: number; xp: number; claimedAchievements: string; therians: Array<{ actionGains: string }> } | null
+  }) as { level: number; xp: number; therianSlots: number; claimedAchievements: string; therians: Array<{ actionGains: string }> } | null
 
   if (!user) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ALREADY_CLAIMED' }, { status: 409 })
   }
 
-  if (!achievement.check({ level: user.level, therians: user.therians })) {
+  if (!achievement.check({ level: user.level, therianSlots: user.therianSlots, therians: user.therians })) {
     return NextResponse.json({ error: 'NOT_UNLOCKED' }, { status: 400 })
   }
 

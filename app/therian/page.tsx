@@ -115,7 +115,7 @@ export default async function TherianPage() {
       </div>
 
       {/* Content */}
-      <main className="relative z-10 max-w-md mx-auto px-4 py-8 space-y-6">
+      <main className="relative z-10 max-w-xl mx-auto px-4 py-8 space-y-6">
         <TherianTabs
           therians={dtos}
           ranks={ranks}

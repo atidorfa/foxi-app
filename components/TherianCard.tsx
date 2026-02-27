@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { TherianDTO } from '@/lib/therian-dto'
@@ -74,7 +74,7 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
   const [resetConfirming, setResetConfirming] = useState(false)
-  const [showStats, setShowStats] = useState(false)
+  const [rightPanelTab, setRightPanelTab] = useState<'runas' | 'accesorios'>('runas')
 
   // Capsule
   const [capsuling, setCapsuling] = useState(false)
@@ -82,9 +82,22 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
   const [showCapsuleConfirm, setShowCapsuleConfirm] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
   const [equipping, setEquipping] = useState(false)
+  const [ownedRunes, setOwnedRunes] = useState<Record<string, number> | null>(null)
+  const [loadingOwnedRunes, setLoadingOwnedRunes] = useState(false)
+
+  const fetchOwnedRunes = useCallback(() => {
+    setLoadingOwnedRunes(true)
+    fetch(`/api/therian/rune-inventory?therianId=${therian.id}`)
+      .then(r => r.ok ? r.json() : { inventory: [] })
+      .then(data => {
+        const map: Record<string, number> = {}
+        for (const item of data.inventory) map[item.runeId] = item.quantity
+        setOwnedRunes(map)
+      })
+      .finally(() => setLoadingOwnedRunes(false))
+  }, [therian.id])
 
   // PvP Abilities
-  const [showAbilities, setShowAbilities] = useState(false)
   const [pendingAbilities, setPendingAbilities] = useState<string[]>(therian.equippedAbilities ?? [])
   const [savingAbilities, setSavingAbilities] = useState(false)
   const [abilitiesError, setAbilitiesError] = useState<string | null>(null)
@@ -157,6 +170,20 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
       return () => clearTimeout(timer)
     }
   }, [therian.canBite, therian.nextBiteAt])
+
+  // Invalidate owned runes cache when wallet changes (e.g. after a rune purchase)
+  useEffect(() => {
+    const handler = () => setOwnedRunes(null)
+    window.addEventListener('wallet-update', handler)
+    return () => window.removeEventListener('wallet-update', handler)
+  }, [])
+
+  // Fetch owned runes when the equip modal opens
+  useEffect(() => {
+    if (selectedSlot !== null && ownedRunes === null && !loadingOwnedRunes) {
+      fetchOwnedRunes()
+    }
+  }, [selectedSlot, ownedRunes, loadingOwnedRunes, fetchOwnedRunes])
 
   // Re-fetch accessories when inventory changes (e.g. after a purchase)
   useEffect(() => {
@@ -233,7 +260,6 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
       if (!res.ok) { setAbilitiesError(data.error ?? 'Error al guardar.'); return }
       setTherian(prev => ({ ...prev, equippedAbilities: pendingAbilities }))
       window.dispatchEvent(new CustomEvent('therian-updated', { detail: { ...therian, equippedAbilities: pendingAbilities } }))
-      setShowAbilities(false)
     } catch {
       setAbilitiesError('Error de conexión.')
     } finally {
@@ -497,100 +523,192 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
   return (
     <div className="relative w-full z-10 flex text-left font-sans group/card">
 
-      {/* Accessories Panel (LEFT) */}
+      {/* Runas + Accesorios Panel (RIGHT) */}
       <div
-        className={`absolute top-[2%] bottom-[2%] left-0 w-[90%] z-0 border-y border-l border-white/10 bg-[#0F0F1A] rounded-l-2xl shadow-xl flex items-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-          showAccessories ? '-translate-x-[95%]' : '-translate-x-[12px]'
+        className={`absolute top-[2%] bottom-[2%] right-0 w-[90%] z-0 border-y border-r border-white/10 bg-[#0F0F1A] rounded-r-2xl shadow-xl flex items-start transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          showAccessories ? 'translate-x-[95%]' : 'translate-x-[12px]'
         }`}
       >
-        <div className={`w-full p-5 pr-10 flex flex-col justify-center space-y-4 transition-opacity duration-300 ${showAccessories ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'}`}>
-          <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold">
-            Accesorios
-          </h3>
-          {loadingAccessories ? (
-            <div className="text-white/20 text-xs text-center py-4">Cargando...</div>
-          ) : (
+        <div className={`w-full p-4 pl-10 flex flex-col justify-start space-y-3 overflow-y-auto max-h-full transition-opacity duration-300 ${showAccessories ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'}`}>
+          {/* Mini tabs */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => setRightPanelTab('runas')}
+              className={`flex-1 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-widest transition-colors ${
+                rightPanelTab === 'runas'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  : 'text-white/30 hover:text-white/50'
+              }`}
+            >
+              Runas
+            </button>
+            <button
+              onClick={() => {
+                setRightPanelTab('accesorios')
+                if (ownedAccessories === null && !loadingAccessories) {
+                  setLoadingAccessories(true)
+                  fetch('/api/inventory')
+                    .then(r => r.ok ? r.json() : { items: [] })
+                    .then(data => {
+                      setOwnedAccessories(
+                        (data.items ?? [])
+                          .filter((i: { type: string }) => i.type === 'ACCESSORY')
+                          .map((i: { itemId: string; name: string; emoji: string; description: string }) => ({
+                            itemId: i.itemId, name: i.name, emoji: i.emoji, description: i.description,
+                          }))
+                      )
+                      setLoadingAccessories(false)
+                    })
+                }
+              }}
+              className={`flex-1 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-widest transition-colors ${
+                rightPanelTab === 'accesorios'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'text-white/30 hover:text-white/50'
+              }`}
+            >
+              Accesorios
+            </button>
+          </div>
+
+          {/* Runas content */}
+          {rightPanelTab === 'runas' && (
             <div className="grid grid-cols-2 gap-2">
-              {ACCESSORY_SLOTS.map((slot) => {
-                const equippedAccId = therian.equippedAccessories[slot.id]
-                // instanceId format: "typeId:uuid" (new) or just "typeId" (legacy)
-                const accTypeId = equippedAccId ? (equippedAccId.includes(':') ? equippedAccId.split(':')[0] : equippedAccId) : null
-                const accMeta = accTypeId ? SHOP_ITEMS.find(i => i.accessoryId === accTypeId) : null
-                return (
-                  <button
-                    key={slot.id}
-                    onClick={() => setSelectedAccessorySlot(slot.id)}
-                    className="group border border-white/10 bg-white/3 rounded-xl p-2 text-left hover:border-amber-500/40 hover:bg-amber-950/20 transition-all min-h-[60px] flex flex-col items-start justify-center cursor-pointer"
-                  >
-                    {equippedAccId && accMeta ? (
-                      <div className="text-amber-300 text-[10px] font-bold leading-tight line-clamp-2">
-                        {accMeta.emoji} {accMeta.name}
+              {equippedRunesArray.map((rune, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSelectedSlot(i)}
+                  className="group border border-white/10 bg-white/3 rounded-xl p-2 text-left hover:border-purple-500/40 hover:bg-purple-950/20 transition-all min-h-[60px] flex flex-col justify-center cursor-pointer"
+                >
+                  {rune ? (
+                    <>
+                      <div className="text-purple-300 text-[10px] font-bold leading-tight mb-1 line-clamp-1">{rune.name}</div>
+                      <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+                        {rune.mod.vitality !== undefined && <span className="text-[9px] text-emerald-400 font-mono">{rune.mod.vitality > 0 ? '+' : ''}{rune.mod.vitality}🌿</span>}
+                        {rune.mod.agility !== undefined && <span className="text-[9px] text-yellow-400 font-mono">{rune.mod.agility > 0 ? '+' : ''}{rune.mod.agility}⚡</span>}
+                        {rune.mod.instinct !== undefined && <span className="text-[9px] text-blue-400 font-mono">{rune.mod.instinct > 0 ? '+' : ''}{rune.mod.instinct}🌌</span>}
+                        {rune.mod.charisma !== undefined && <span className="text-[9px] text-amber-400 font-mono">{rune.mod.charisma > 0 ? '+' : ''}{rune.mod.charisma}✨</span>}
                       </div>
-                    ) : (
-                      <div className="text-white/25 text-[9px] uppercase tracking-wider group-hover:text-amber-400/50 transition-colors">
-                        {slot.emoji} {slot.name}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
+                    </>
+                  ) : (
+                    <div className="text-white/15 text-lg text-center w-full group-hover:text-purple-400/50 transition-colors">+</div>
+                  )}
+                </button>
+              ))}
             </div>
           )}
-        </div>
 
-        {/* Toggle arrow button attached to the left edge */}
-        <button
-          onClick={openAccessoriesPanel}
-          className={`absolute top-1/2 -left-7 -translate-y-1/2 w-7 h-16 bg-[#0F0F1A] border-y border-l border-white/10 rounded-l-xl flex items-center justify-center hover:bg-[#1a1a2e] transition-all text-white/50 hover:text-white cursor-pointer shadow-md z-10 ${!showAccessories && 'group-hover/card:-translate-x-1'}`}
-        >
-          <span className={`transition-transform duration-500 text-[10px] ${showAccessories ? 'rotate-180' : ''}`}>
-            ◀
-          </span>
-        </button>
-      </div>
+          {/* Accesorios content */}
+          {rightPanelTab === 'accesorios' && (
+            loadingAccessories ? (
+              <div className="text-white/20 text-xs text-center py-4">Cargando...</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {ACCESSORY_SLOTS.map((slot) => {
+                  const equippedAccId = therian.equippedAccessories[slot.id]
+                  const accTypeId = equippedAccId ? (equippedAccId.includes(':') ? equippedAccId.split(':')[0] : equippedAccId) : null
+                  const accMeta = accTypeId ? SHOP_ITEMS.find(i => i.accessoryId === accTypeId) : null
+                  return (
+                    <button
+                      key={slot.id}
+                      onClick={() => setSelectedAccessorySlot(slot.id)}
+                      className="group border border-white/10 bg-white/3 rounded-xl p-2 text-left hover:border-amber-500/40 hover:bg-amber-950/20 transition-all min-h-[60px] flex flex-col items-start justify-center cursor-pointer"
+                    >
+                      {equippedAccId && accMeta ? (
+                        <div className="text-amber-300 text-[10px] font-bold leading-tight line-clamp-2">
+                          {accMeta.emoji} {accMeta.name}
+                        </div>
+                      ) : (
+                        <div className="text-white/25 text-[9px] uppercase tracking-wider group-hover:text-amber-400/50 transition-colors">
+                          {slot.emoji} {slot.name}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          )}
 
-      {/* Side Stats Panel */}
-      <div 
-        className={`absolute top-[2%] bottom-[2%] right-0 w-[90%] z-0 border-y border-r border-white/10 bg-[#0F0F1A] rounded-r-2xl shadow-xl flex items-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-          showStats ? 'translate-x-[95%]' : 'translate-x-[12px]'
-        }`}
-      >
-        <div className={`w-full p-5 pl-10 flex flex-col justify-center space-y-4 transition-opacity duration-300 ${showStats ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none'}`}>
-          <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold">
-            Runas
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {equippedRunesArray.map((rune, i) => (
-              <button
-                key={i}
-                onClick={() => setSelectedSlot(i)}
-                className="group border border-white/10 bg-white/3 rounded-xl p-2 text-left hover:border-purple-500/40 hover:bg-purple-950/20 transition-all min-h-[60px] flex flex-col justify-center cursor-pointer"
-              >
-                {rune ? (
-                  <>
-                    <div className="text-purple-300 text-[10px] font-bold leading-tight mb-1 line-clamp-1">{rune.name}</div>
-                    <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-                      {rune.mod.vitality !== undefined && <span className="text-[9px] text-emerald-400 font-mono">{rune.mod.vitality > 0 ? '+' : ''}{rune.mod.vitality}🌿</span>}
-                      {rune.mod.agility !== undefined && <span className="text-[9px] text-yellow-400 font-mono">{rune.mod.agility > 0 ? '+' : ''}{rune.mod.agility}⚡</span>}
-                      {rune.mod.instinct !== undefined && <span className="text-[9px] text-blue-400 font-mono">{rune.mod.instinct > 0 ? '+' : ''}{rune.mod.instinct}🌌</span>}
-                      {rune.mod.charisma !== undefined && <span className="text-[9px] text-amber-400 font-mono">{rune.mod.charisma > 0 ? '+' : ''}{rune.mod.charisma}✨</span>}
+          {/* PvP Abilities */}
+          {(() => {
+            const archetype = therian.trait.id
+            const innate = INNATE_BY_ARCHETYPE[archetype]
+            const archAbilities = ABILITIES.filter(a => a.archetype === archetype)
+            if (archAbilities.length === 0) return null
+            const ARCH_COLORS: Record<string, { text: string; border: string; bg: string }> = {
+              forestal:  { text: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' },
+              electrico: { text: 'text-yellow-400',  border: 'border-yellow-500/30',  bg: 'bg-yellow-500/10' },
+              acuatico:  { text: 'text-blue-400',    border: 'border-blue-500/30',    bg: 'bg-blue-500/10' },
+              volcanico: { text: 'text-orange-400',  border: 'border-orange-500/30',  bg: 'bg-orange-500/10' },
+            }
+            const colors = ARCH_COLORS[archetype] ?? ARCH_COLORS.forestal
+            const hasPendingChange = JSON.stringify([...pendingAbilities].sort()) !== JSON.stringify([...(therian.equippedAbilities ?? [])].sort())
+            return (
+              <div className="space-y-2 pt-3 border-t border-white/8">
+                <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold">Habilidades PvP</h3>
+                {innate && (
+                  <div>
+                    <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1">Innato</p>
+                    <div className={`rounded-lg border ${colors.border} ${colors.bg} px-2 py-1.5 flex items-center justify-between`}>
+                      <span className={`text-[10px] font-semibold ${colors.text}`}>★ {innate.name}</span>
+                      <span className="text-white/30 text-[9px]">Siempre activo</span>
                     </div>
-                  </>
-                ) : (
-                  <div className="text-white/15 text-lg text-center w-full group-hover:text-purple-400/50 transition-colors">+</div>
+                  </div>
                 )}
-              </button>
-            ))}
-          </div>
+                <div>
+                  <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1">Equipables ({pendingAbilities.length}/3)</p>
+                  <div className="space-y-1">
+                    {archAbilities.map(ab => {
+                      const isOn = pendingAbilities.includes(ab.id)
+                      const canToggle = isOn || pendingAbilities.length < 3
+                      return (
+                        <button
+                          key={ab.id}
+                          onClick={() => canToggle && toggleAbility(ab.id)}
+                          disabled={!canToggle}
+                          className={`w-full flex items-center justify-between rounded-lg border px-2 py-1.5 text-left transition-all ${
+                            isOn
+                              ? `${colors.border} ${colors.bg}`
+                              : canToggle
+                                ? 'border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5'
+                                : 'border-white/5 bg-white/2 opacity-30 cursor-not-allowed'
+                          }`}
+                        >
+                          <div>
+                            <span className={`text-[10px] font-semibold ${isOn ? colors.text : 'text-white/50'}`}>{ab.name}</span>
+                            {ab.type === 'passive' && <span className="ml-1 text-[9px] text-white/25 border border-white/15 px-1 rounded">(P)</span>}
+                          </div>
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isOn ? 'border-white/50 bg-white/20' : 'border-white/20'}`}>
+                            {isOn && <span className={`text-[9px] font-bold ${colors.text}`}>✓</span>}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {abilitiesError && <p className="text-red-400 text-[10px] text-center">{abilitiesError}</p>}
+                {hasPendingChange && (
+                  <button
+                    onClick={handleSaveAbilities}
+                    disabled={savingAbilities}
+                    className="w-full py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-white text-[10px] font-semibold transition-all disabled:opacity-40"
+                  >
+                    {savingAbilities ? 'Guardando...' : '💾 Guardar'}
+                  </button>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Toggle arrow button attached to the right edge */}
         <button
-           onClick={() => setShowStats(!showStats)}
-           className={`absolute top-1/2 -right-7 -translate-y-1/2 w-7 h-16 bg-[#0F0F1A] border-y border-r border-white/10 rounded-r-xl flex items-center justify-center hover:bg-[#1a1a2e] transition-all text-white/50 hover:text-white cursor-pointer shadow-md z-10 ${!showStats && 'group-hover/card:translate-x-1'}`}
+          onClick={openAccessoriesPanel}
+          className={`absolute top-1/2 -right-7 -translate-y-1/2 w-7 h-16 bg-[#0F0F1A] border-y border-r border-white/10 rounded-r-xl flex items-center justify-center hover:bg-[#1a1a2e] transition-all text-white/50 hover:text-white cursor-pointer shadow-md z-10 ${!showAccessories && 'group-hover/card:translate-x-1'}`}
         >
-          <span className={`transition-transform duration-500 text-[10px] ${showStats ? 'rotate-180' : ''}`}>
-             ▶
+          <span className={`transition-transform duration-500 text-[10px] ${showAccessories ? 'rotate-180' : ''}`}>
+            ▶
           </span>
         </button>
       </div>
@@ -610,7 +728,7 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
           />
         </div>
 
-        <div className="relative p-6 space-y-6">
+        <div className="relative p-5 space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0 pr-3">
@@ -797,7 +915,7 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
         {/* Avatar */}
         <div className="flex justify-center">
           <div className="relative">
-            <TherianAvatar therian={therian} size={220} animated />
+            <TherianAvatar therian={therian} size={180} animated />
           </div>
         </div>
 
@@ -881,121 +999,6 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
               </div>
               <p className="text-white font-semibold text-sm">{therian.aura.name}</p>
               <p className="text-[#A99DC0] text-xs mt-0.5 leading-relaxed">{therian.aura.description}</p>
-            </div>
-          )
-        })()}
-
-        {/* PvP Abilities */}
-        {(() => {
-          const archetype = therian.trait.id
-          const innate = INNATE_BY_ARCHETYPE[archetype]
-          const archAbilities = ABILITIES.filter(a => a.archetype === archetype)
-          const hasPanel = archAbilities.length > 0
-
-          if (!hasPanel) return null
-
-          const ARCH_COLORS: Record<string, { text: string; border: string; bg: string }> = {
-            forestal:  { text: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' },
-            electrico: { text: 'text-yellow-400',  border: 'border-yellow-500/30',  bg: 'bg-yellow-500/10' },
-            acuatico:  { text: 'text-blue-400',    border: 'border-blue-500/30',    bg: 'bg-blue-500/10' },
-            volcanico: { text: 'text-orange-400',  border: 'border-orange-500/30',  bg: 'bg-orange-500/10' },
-          }
-          const colors = ARCH_COLORS[archetype] ?? ARCH_COLORS.forestal
-          const hasPendingChange = JSON.stringify([...pendingAbilities].sort()) !== JSON.stringify([...(therian.equippedAbilities ?? [])].sort())
-
-          return (
-            <div className="space-y-2">
-              <button
-                onClick={() => { setShowAbilities(p => !p); setAbilitiesError(null) }}
-                className="w-full flex items-center justify-between text-xs text-white/40 hover:text-white/60 transition-colors py-1"
-              >
-                <span className="flex items-center gap-1.5">
-                  <span>⚔️</span>
-                  <span className="uppercase tracking-widest font-semibold">Habilidades PvP</span>
-                  {(therian.equippedAbilities?.length ?? 0) > 0 && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${colors.bg} ${colors.text} border ${colors.border}`}>
-                      {therian.equippedAbilities!.length}/3
-                    </span>
-                  )}
-                </span>
-                <span className={`transition-transform duration-300 ${showAbilities ? 'rotate-180' : ''}`}>▾</span>
-              </button>
-
-              {showAbilities && (
-                <div className="space-y-3 pb-1">
-                  {/* Innate (read-only) */}
-                  {innate && (
-                    <div>
-                      <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1.5">Innato (siempre activo)</p>
-                      <div className={`rounded-lg border ${colors.border} ${colors.bg} px-3 py-2 flex items-center justify-between`}>
-                        <span className={`text-xs font-semibold ${colors.text}`}>★ {innate.name}</span>
-                        <span className="text-white/30 text-[10px]">Daño básico</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Equipable (toggle max 4) */}
-                  <div>
-                    <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1.5">
-                      Equipables ({pendingAbilities.length}/3)
-                    </p>
-                    <div className="space-y-1.5">
-                      {archAbilities.map(ab => {
-                        const isOn = pendingAbilities.includes(ab.id)
-                        const canToggle = isOn || pendingAbilities.length < 3
-                        return (
-                          <button
-                            key={ab.id}
-                            onClick={() => canToggle && toggleAbility(ab.id)}
-                            disabled={!canToggle}
-                            className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 transition-all ${
-                              isOn
-                                ? `${colors.border} ${colors.bg}`
-                                : canToggle
-                                  ? 'border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5'
-                                  : 'border-white/5 bg-white/2 opacity-30 cursor-not-allowed'
-                            }`}
-                          >
-                            <div className="text-left">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`text-xs font-semibold ${isOn ? colors.text : 'text-white/60'}`}>
-                                  {ab.name}
-                                </span>
-                                {ab.type === 'passive' && (
-                                  <span className="text-[10px] text-white/30 border border-white/15 px-1 rounded">(P)</span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-white/30 mt-0.5">
-                                {ab.target === 'all' ? 'AoE' : ab.target === 'ally' ? 'Aliado' : ab.target === 'self' ? 'Propio' : 'Objetivo'}
-                                {ab.cooldown > 0 && ` · CD ${ab.cooldown}t`}
-                              </div>
-                            </div>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                              isOn ? `border-white/50 bg-white/20` : 'border-white/20'
-                            }`}>
-                              {isOn && <span className={`text-[10px] font-bold ${colors.text}`}>✓</span>}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {abilitiesError && (
-                    <p className="text-red-400 text-xs text-center">{abilitiesError}</p>
-                  )}
-
-                  {hasPendingChange && (
-                    <button
-                      onClick={handleSaveAbilities}
-                      disabled={savingAbilities}
-                      className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-semibold transition-all disabled:opacity-40"
-                    >
-                      {savingAbilities ? 'Guardando...' : '💾 Guardar habilidades'}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           )
         })()}
@@ -1271,41 +1274,53 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
                 className="absolute right-4 text-white/40 hover:text-white transition-colors"
               >✕</button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 grid gap-3 grid-cols-1 md:grid-cols-2">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
               <button
                 disabled={equipping}
                 onClick={() => handleEquip(null)}
-                className="col-span-1 md:col-span-2 p-3 rounded-xl border border-white/10 text-[#8B84B0] hover:text-white hover:border-white/30 text-sm text-center disabled:opacity-50 transition-colors"
+                className="w-full p-3 rounded-xl border border-white/10 text-[#8B84B0] hover:text-white hover:border-white/30 text-sm text-center disabled:opacity-50 transition-colors"
               >
                 Quitar Runa Actual
               </button>
-              {RUNES.map(rune => {
-                const isEquipped = equippedRunesArray.some(r => r?.id === rune.id)
-                return (
+              {loadingOwnedRunes ? (
+                <div className="text-white/30 text-xs text-center py-4">Cargando...</div>
+              ) : ownedRunes && Object.keys(ownedRunes).length === 0 ? (
+                <div className="text-center py-6 space-y-3">
+                  <p className="text-white/30 text-xs">No tenés runas.</p>
                   <button
-                    key={rune.id}
-                    onClick={() => !isEquipped && handleEquip(rune.id)}
-                    disabled={equipping || isEquipped}
-                    className={`flex flex-col text-left p-3 rounded-xl border transition-all ${
-                      isEquipped
-                        ? 'border-white/5 bg-white/5 opacity-50 cursor-not-allowed'
-                        : 'border-white/10 bg-white/5 hover:border-purple-500 hover:bg-white/10 active:scale-[0.98]'
-                    }`}
+                    onClick={() => {
+                      setSelectedSlot(null)
+                      window.dispatchEvent(new CustomEvent('open-shop', { detail: { tab: 'runas' } }))
+                    }}
+                    className="text-purple-400 text-xs hover:text-purple-300 transition-colors"
                   >
-                    <div className="flex justify-between items-start mb-1 w-full gap-2">
-                      <span className="text-purple-300 font-bold text-sm leading-tight">{rune.name}</span>
-                      {isEquipped && <span className="text-[9px] text-white/30 uppercase bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">Equipada</span>}
-                    </div>
-                    <p className="text-[#8B84B0] text-xs italic mb-2 flex-1">{rune.lore}</p>
-                    <div className="font-mono text-[11px] flex flex-wrap gap-2 pt-2 border-t border-white/5">
-                      {rune.mod.vitality !== undefined && <span className="text-emerald-400">🌿 {rune.mod.vitality > 0 ? '+' : ''}{rune.mod.vitality}</span>}
-                      {rune.mod.agility !== undefined && <span className="text-yellow-400">⚡ {rune.mod.agility > 0 ? '+' : ''}{rune.mod.agility}</span>}
-                      {rune.mod.instinct !== undefined && <span className="text-blue-400">🌌 {rune.mod.instinct > 0 ? '+' : ''}{rune.mod.instinct}</span>}
-                      {rune.mod.charisma !== undefined && <span className="text-amber-400">✨ {rune.mod.charisma > 0 ? '+' : ''}{rune.mod.charisma}</span>}
-                    </div>
+                    🔮 Comprar en la tienda →
                   </button>
-                )
-              })}
+                </div>
+              ) : (
+                <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                  {RUNES.filter(r => (ownedRunes?.[r.id] ?? 0) > 0).map(rune => (
+                    <button
+                      key={rune.id}
+                      onClick={() => handleEquip(rune.id)}
+                      disabled={equipping}
+                      className="flex flex-col text-left p-3 rounded-xl border transition-all border-white/10 bg-white/5 hover:border-purple-500 hover:bg-white/10 active:scale-[0.98] disabled:opacity-50"
+                    >
+                      <div className="flex justify-between items-start mb-1 w-full gap-2">
+                        <span className="text-purple-300 font-bold text-sm leading-tight">{rune.name}</span>
+                        <span className="text-[9px] text-white/30 bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">×{ownedRunes?.[rune.id]}</span>
+                      </div>
+                      <p className="text-[#8B84B0] text-xs italic mb-2 flex-1">{rune.lore}</p>
+                      <div className="font-mono text-[11px] flex flex-wrap gap-2 pt-2 border-t border-white/5">
+                        {rune.mod.vitality  !== undefined && <span className="text-emerald-400">🌿 +{rune.mod.vitality}</span>}
+                        {rune.mod.agility   !== undefined && <span className="text-yellow-400">⚡ +{rune.mod.agility}</span>}
+                        {rune.mod.instinct  !== undefined && <span className="text-blue-400">🌌 +{rune.mod.instinct}</span>}
+                        {rune.mod.charisma  !== undefined && <span className="text-amber-400">✨ +{rune.mod.charisma}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

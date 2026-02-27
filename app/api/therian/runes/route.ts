@@ -30,6 +30,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'NO_THERIAN' }, { status: 404 })
     }
 
+    // Verify ownership when equipping a rune
+    if (runeId !== null) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const owned = await (db as any).runeInventory.findFirst({
+        where: { therianId: therian.id, runeId },
+      })
+      if (!owned) {
+        return NextResponse.json({ error: 'RUNE_NOT_OWNED' }, { status: 403 })
+      }
+    }
+
     let runes: (string | null)[] = JSON.parse(therian.equippedRunes || '[]')
     
     // Ensure array has exactly 6 elements

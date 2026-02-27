@@ -2,6 +2,7 @@ export interface Rune {
   id: string
   name: string
   lore: string
+  tier: 1 | 2 | 3 | 4 | 5
   mod: {
     vitality?: number
     agility?: number
@@ -10,42 +11,89 @@ export interface Rune {
   }
 }
 
-// 50 runas simples generadas con distintos incrementos de estadísticas
-export const RUNES: Rune[] = [
-  ...[
-    { id: 'v_1', name: 'Vitalidad Menor', lore: 'Aumenta un poco tu aguante.', mod: { vitality: 2 } },
-    { id: 'v_2', name: 'Vitalidad Fuerte', lore: 'Las heridas sanan algo más rápido.', mod: { vitality: 5 } },
-    { id: 'v_3', name: 'Vigor del Oso', lore: 'Sientes que podrías derribar un árbol.', mod: { vitality: 8 } },
-    { id: 'v_4', name: 'Sangre Hirviente', lore: 'Otorga gran vitalidad.', mod: { vitality: 12, agility: -2 } },
-    { id: 'a_1', name: 'Agilidad Menor', lore: 'Movimientos levemente fluidos.', mod: { agility: 2 } },
-    { id: 'a_2', name: 'Agilidad Fuerte', lore: 'Es más difícil atraparte.', mod: { agility: 5 } },
-    { id: 'a_3', name: 'Paso del Viento', lore: 'Casi no tocas el suelo al caminar.', mod: { agility: 8 } },
-    { id: 'a_4', name: 'Reflejo de Caza', lore: 'Otorga gran agilidad.', mod: { agility: 12, instinct: -2 } },
-    { id: 'i_1', name: 'Instinto Menor', lore: 'Prestas un poco más de atención.', mod: { instinct: 2 } },
-    { id: 'i_2', name: 'Instinto Fuerte', lore: 'Tus sentidos son notoriamente agudos.', mod: { instinct: 5 } },
-    { id: 'i_3', name: 'Tercer Ojo', lore: 'Ves sombras antes de que caigan.', mod: { instinct: 8 } },
-    { id: 'i_4', name: 'Conexión Arcana', lore: 'Otorga gran instinto.', mod: { instinct: 12, charisma: -2 } },
-    { id: 'c_1', name: 'Carisma Menor', lore: 'Apareces un poco más agradable.', mod: { charisma: 2 } },
-    { id: 'c_2', name: 'Carisma Fuerte', lore: 'Atraes las miradas, inevitablemente.', mod: { charisma: 5 } },
-    { id: 'c_3', name: 'Aura Magnética', lore: 'Todos te ven como un líder natural.', mod: { charisma: 8 } },
-    { id: 'c_4', name: 'Presencia Real', lore: 'Otorga gran carisma.', mod: { charisma: 12, vitality: -2 } },
-  ],
-  ...Array.from({ length: 34 }).map((_, i) => {
-    // Generación procedural de las otras para llegar a 50
-    const stats: (keyof Rune['mod'])[] = ['vitality', 'agility', 'instinct', 'charisma']
-    const stat1 = stats[i % 4]
-    const stat2 = stats[(i + 1) % 4]
-    return {
-      id: `mixed_${i}`,
-      name: `Runa Dual ${i + 1}`,
-      lore: `Una mixtura sutil de energías ancestrales.`,
-      mod: {
-        [stat1]: (i % 3) + 2,
-        [stat2]: (i % 4) + 1,
-      }
-    }
-  })
+const DEFS: Array<{
+  key: string
+  names: readonly [string, string, string, string, string]
+  lores: readonly [string, string, string, string, string]
+  mods: readonly [Rune['mod'], Rune['mod'], Rune['mod'], Rune['mod'], Rune['mod']]
+}> = [
+  {
+    key: 'vit',
+    names: ['Runa de Vitalidad I', 'Runa de Vitalidad II', 'Runa de Vitalidad III', 'Runa de Vitalidad IV', 'Runa de Vitalidad V'],
+    lores: [
+      'La sangre fluye un poco más fuerte.',
+      'El cuerpo resiste con más firmeza.',
+      'Las heridas se cierran antes de lo esperado.',
+      'Tu aguante supera al de cualquier común.',
+      'Indestructible en cuerpo y alma.',
+    ],
+    mods: [{ vitality: 1 }, { vitality: 2 }, { vitality: 3 }, { vitality: 4 }, { vitality: 5 }],
+  },
+  {
+    key: 'agi',
+    names: ['Runa de Agilidad I', 'Runa de Agilidad II', 'Runa de Agilidad III', 'Runa de Agilidad IV', 'Runa de Agilidad V'],
+    lores: [
+      'El cuerpo responde al instante.',
+      'Cada paso es más veloz que el anterior.',
+      'Difícil de atrapar para cualquiera.',
+      'Te mueves como el viento mismo.',
+      'Nadie puede seguirte.',
+    ],
+    mods: [{ agility: 1 }, { agility: 2 }, { agility: 3 }, { agility: 4 }, { agility: 5 }],
+  },
+  {
+    key: 'ins',
+    names: ['Runa de Instinto I', 'Runa de Instinto II', 'Runa de Instinto III', 'Runa de Instinto IV', 'Runa de Instinto V'],
+    lores: [
+      'Los sentidos se agudizan levemente.',
+      'Percibes lo que otros suelen ignorar.',
+      'Nada escapa a tu atención.',
+      'Ves antes de mirar.',
+      'El mundo te habla en silencio.',
+    ],
+    mods: [{ instinct: 1 }, { instinct: 2 }, { instinct: 3 }, { instinct: 4 }, { instinct: 5 }],
+  },
+  {
+    key: 'cha',
+    names: ['Runa de Carisma I', 'Runa de Carisma II', 'Runa de Carisma III', 'Runa de Carisma IV', 'Runa de Carisma V'],
+    lores: [
+      'Tu presencia se vuelve levemente magnética.',
+      'Las miradas te siguen sin razón aparente.',
+      'Convences sin esfuerzo visible.',
+      'Tu aura transforma el ambiente.',
+      'Nadie puede ignorarte.',
+    ],
+    mods: [{ charisma: 1 }, { charisma: 2 }, { charisma: 3 }, { charisma: 4 }, { charisma: 5 }],
+  },
+  {
+    key: 'all',
+    names: ['Runa de Equilibrio I', 'Runa de Equilibrio II', 'Runa de Equilibrio III', 'Runa de Equilibrio IV', 'Runa de Equilibrio V'],
+    lores: [
+      'Un balance sutil entre las fuerzas.',
+      'Cuerpo y espíritu en armonía.',
+      'La unión de todas las fuerzas.',
+      'Equilibrio casi perfecto.',
+      'La esencia completa de toda existencia.',
+    ],
+    mods: [
+      { vitality: 1, agility: 1, instinct: 1, charisma: 1 },
+      { vitality: 2, agility: 2, instinct: 2, charisma: 2 },
+      { vitality: 3, agility: 3, instinct: 3, charisma: 3 },
+      { vitality: 4, agility: 4, instinct: 4, charisma: 4 },
+      { vitality: 5, agility: 5, instinct: 5, charisma: 5 },
+    ],
+  },
 ]
+
+export const RUNES: Rune[] = DEFS.flatMap(def =>
+  ([1, 2, 3, 4, 5] as const).map(tier => ({
+    id: `rune_${def.key}_t${tier}`,
+    name: def.names[tier - 1],
+    lore: def.lores[tier - 1],
+    tier,
+    mod: def.mods[tier - 1],
+  }))
+)
 
 export function getRuneById(id: string): Rune | undefined {
   return RUNES.find(r => r.id === id)

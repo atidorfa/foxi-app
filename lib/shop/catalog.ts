@@ -1,4 +1,4 @@
-export type ShopItemType = 'cosmetic' | 'service' | 'slot'
+export type ShopItemType = 'cosmetic' | 'service' | 'slot' | 'rune'
 
 export interface ShopItem {
   id: string
@@ -10,6 +10,8 @@ export interface ShopItem {
   type: ShopItemType
   accessoryId?: string
   slot?: string // accessory slot ID (orejas | cola | ojos | cabeza | anteojos | garras)
+  runeId?: string
+  tier?: 1 | 2 | 3 | 4 | 5
 }
 
 export const SHOP_ITEMS: ShopItem[] = [
@@ -18,8 +20,8 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Cambio de nombre',
     emoji: '✏️',
     description: 'Elige un nuevo nombre único para tu Therian.',
-    costGold: 500,
-    costCoin: 0,
+    costGold: 0,
+    costCoin: 100,
     type: 'service',
   },
   {
@@ -85,6 +87,27 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'acc_claws_crow', name: 'Talones de Cuervo', emoji: '🪶', description: 'Talones de ave de cuervo.',                       costGold: 550, costCoin: 0, type: 'cosmetic', accessoryId: 'claws_crow', slot: 'garras' },
   { id: 'acc_claws_deer', name: 'Pezuñas de Ciervo', emoji: '🦌', description: 'Pezuñas divididas de ciervo.',                   costGold: 500, costCoin: 0, type: 'cosmetic', accessoryId: 'claws_deer', slot: 'garras' },
   { id: 'acc_claws_bear', name: 'Garras de Oso',     emoji: '🐻', description: '4 garras anchas y poderosas de oso.',             costGold: 550, costCoin: 0, type: 'cosmetic', accessoryId: 'claws_bear', slot: 'garras' },
+
+  // ── RUNAS T1 (200 oro) ─────────────────────────────────────────────────────
+  { id: 'rune_vit_t1', name: 'Runa de Vitalidad I',   emoji: '🌿', description: '+1 Vitalidad. La sangre fluye más fuerte.',              costGold: 200, costCoin: 0, type: 'rune', runeId: 'rune_vit_t1', tier: 1 },
+  { id: 'rune_agi_t1', name: 'Runa de Agilidad I',    emoji: '⚡', description: '+1 Agilidad. El cuerpo responde al instante.',           costGold: 200, costCoin: 0, type: 'rune', runeId: 'rune_agi_t1', tier: 1 },
+  { id: 'rune_ins_t1', name: 'Runa de Instinto I',    emoji: '🌌', description: '+1 Instinto. Los sentidos se agudizan levemente.',       costGold: 200, costCoin: 0, type: 'rune', runeId: 'rune_ins_t1', tier: 1 },
+  { id: 'rune_cha_t1', name: 'Runa de Carisma I',     emoji: '✨', description: '+1 Carisma. Tu presencia se vuelve magnética.',          costGold: 200, costCoin: 0, type: 'rune', runeId: 'rune_cha_t1', tier: 1 },
+  { id: 'rune_all_t1', name: 'Runa de Equilibrio I',  emoji: '🔮', description: '+1 a todos los stats. Un balance sutil.',                costGold: 1000, costCoin: 0, type: 'rune', runeId: 'rune_all_t1', tier: 1 },
+
+  // ── RUNAS T2 (800 oro) ─────────────────────────────────────────────────────
+  { id: 'rune_vit_t2', name: 'Runa de Vitalidad II',  emoji: '🌿', description: '+2 Vitalidad. El cuerpo resiste con más firmeza.',       costGold: 800, costCoin: 0, type: 'rune', runeId: 'rune_vit_t2', tier: 2 },
+  { id: 'rune_agi_t2', name: 'Runa de Agilidad II',   emoji: '⚡', description: '+2 Agilidad. Cada paso es más veloz.',                   costGold: 800, costCoin: 0, type: 'rune', runeId: 'rune_agi_t2', tier: 2 },
+  { id: 'rune_ins_t2', name: 'Runa de Instinto II',   emoji: '🌌', description: '+2 Instinto. Percibes lo que otros ignoran.',            costGold: 800, costCoin: 0, type: 'rune', runeId: 'rune_ins_t2', tier: 2 },
+  { id: 'rune_cha_t2', name: 'Runa de Carisma II',    emoji: '✨', description: '+2 Carisma. Las miradas te siguen.',                    costGold: 800, costCoin: 0, type: 'rune', runeId: 'rune_cha_t2', tier: 2 },
+  { id: 'rune_all_t2', name: 'Runa de Equilibrio II', emoji: '🔮', description: '+2 a todos los stats. Cuerpo y espíritu en armonía.',   costGold: 2400, costCoin: 0, type: 'rune', runeId: 'rune_all_t2', tier: 2 },
+
+  // ── RUNAS T3 (50 esencia) ──────────────────────────────────────────────────
+  { id: 'rune_vit_t3', name: 'Runa de Vitalidad III', emoji: '🌿', description: '+3 Vitalidad. Las heridas se cierran antes.',            costGold: 0, costCoin: 50, type: 'rune', runeId: 'rune_vit_t3', tier: 3 },
+  { id: 'rune_agi_t3', name: 'Runa de Agilidad III',  emoji: '⚡', description: '+3 Agilidad. Difícil de atrapar para cualquiera.',       costGold: 0, costCoin: 50, type: 'rune', runeId: 'rune_agi_t3', tier: 3 },
+  { id: 'rune_ins_t3', name: 'Runa de Instinto III',  emoji: '🌌', description: '+3 Instinto. Nada escapa a tu atención.',                costGold: 0, costCoin: 50, type: 'rune', runeId: 'rune_ins_t3', tier: 3 },
+  { id: 'rune_cha_t3', name: 'Runa de Carisma III',   emoji: '✨', description: '+3 Carisma. Convences sin esfuerzo.',                   costGold: 0, costCoin: 50, type: 'rune', runeId: 'rune_cha_t3', tier: 3 },
+  { id: 'rune_all_t3', name: 'Runa de Equilibrio III',emoji: '🔮', description: '+3 a todos los stats. La unión de todas las fuerzas.',  costGold: 0, costCoin: 150, type: 'rune', runeId: 'rune_all_t3', tier: 3 },
 ]
 
 export function getShopItem(id: string): ShopItem | undefined {
