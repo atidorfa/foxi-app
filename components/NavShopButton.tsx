@@ -19,6 +19,7 @@ export default function NavShopButton({ therian: initialTherian }: Props) {
   const [showShop, setShowShop] = useState(false)
   const [wallet, setWallet] = useState<Wallet | null>(null)
   const [localTherian, setLocalTherian] = useState(initialTherian)
+  const [therians, setTherians] = useState<TherianDTO[]>([initialTherian])
   const [initialTab, setInitialTab] = useState<'huevos' | 'accesorios' | 'runas' | 'cuenta'>('accesorios')
   const [highlightItem, setHighlightItem] = useState<string | undefined>(undefined)
 
@@ -32,6 +33,10 @@ export default function NavShopButton({ therian: initialTherian }: Props) {
         .then(data => { if (data) setWallet(data) })
         .catch(() => {})
     }
+    fetch('/api/therians/mine')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (Array.isArray(data) && data.length > 0) setTherians(data) })
+      .catch(() => {})
   }
 
   useEffect(() => {
@@ -56,6 +61,7 @@ export default function NavShopButton({ therian: initialTherian }: Props) {
         wallet ? (
           <ShopModal
             therian={localTherian}
+            therians={therians}
             wallet={wallet}
             initialTab={initialTab}
             highlightItem={highlightItem}

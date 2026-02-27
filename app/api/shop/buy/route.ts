@@ -11,6 +11,7 @@ const schema = z.object({
   itemId: z.string(),
   quantity: z.number().int().min(1).max(99).optional().default(1),
   newName: z.string().min(2).max(24).regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/).optional(),
+  therianId: z.string().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -120,7 +121,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'NAME_REQUIRED' }, { status: 400 })
     }
 
-    const therian = await db.therian.findFirst({ where: { userId: session.user.id }, orderBy: { createdAt: 'asc' } })
+    const therian = body.therianId
+      ? await db.therian.findFirst({ where: { id: body.therianId, userId: session.user.id, status: 'active' } })
+      : await db.therian.findFirst({ where: { userId: session.user.id }, orderBy: { createdAt: 'asc' } })
     if (!therian) {
       return NextResponse.json({ error: 'NO_THERIAN' }, { status: 404 })
     }

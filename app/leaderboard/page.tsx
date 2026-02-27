@@ -8,14 +8,17 @@ import type { TherianAppearance } from '@/lib/generation/engine'
 
 export const dynamic = 'force-dynamic'
 
+function netScore(t: { bites: number; deaths?: number | null }): number {
+  return t.bites - (t.deaths ?? 0)
+}
+
 export default async function LeaderboardPage() {
   const session = await getSession()
 
-  const [top, topLevelUsers] = await Promise.all([
+  // Fetch all active named therians for combat ranking (sort by net score in JS)
+  const [allActive, topLevelUsers] = await Promise.all([
     db.therian.findMany({
       where: { name: { not: null }, status: 'active' },
-      orderBy: [{ bites: 'desc' }, { createdAt: 'asc' }],
-      take: 20,
       include: { user: { select: { id: true, name: true, email: true } } },
     }),
     db.user.findMany({
@@ -34,13 +37,21 @@ export default async function LeaderboardPage() {
     }),
   ])
 
+  // Sort by net score (bites - deaths) DESC, tie-break by createdAt ASC
+  const top = [...allActive]
+    .sort((a, b) => {
+      const diff = netScore(b as any) - netScore(a as any)
+      return diff !== 0 ? diff : a.createdAt.getTime() - b.createdAt.getTime()
+    })
+    .slice(0, 20)
+
   let userRank: number | null = null
   let userRankLevel: number | null = null
   if (session?.user?.id) {
-    const [userTherian, currentUser] = await Promise.all([
-      db.therian.findFirst({
-        where: { userId: session.user.id, status: 'active' },
-      }),
+    const userTherian = allActive.find(t => t.user.id === session.user.id)
+
+    const [, currentUser] = await Promise.all([
+      Promise.resolve(null),
       db.user.findUnique({
         where: { id: session.user.id },
         select: {
@@ -53,15 +64,12 @@ export default async function LeaderboardPage() {
     ])
 
     if (userTherian) {
-      const aboveBites = await db.therian.count({
-        where: {
-          status: 'active',
-          OR: [
-            { bites: { gt: userTherian.bites } },
-            { bites: userTherian.bites, createdAt: { lt: userTherian.createdAt } },
-          ],
-        },
-      })
+      const userNet = netScore(userTherian as any)
+      const aboveBites = allActive.filter(t => {
+        if (t.id === userTherian.id) return false
+        const net = netScore(t as any)
+        return net > userNet || (net === userNet && t.createdAt < userTherian.createdAt)
+      }).length
       userRank = aboveBites + 1
     }
 
@@ -93,6 +101,7 @@ export default async function LeaderboardPage() {
         : { id: t.speciesId, name: t.speciesId, emoji: '?' },
       rarity: t.rarity,
       bites: t.bites,
+      deaths: (t as any).deaths ?? 0,
       appearance: {
         paletteColors: palette
           ? { primary: palette.primary, secondary: palette.secondary, accent: palette.accent }
@@ -118,6 +127,7 @@ export default async function LeaderboardPage() {
         : { id: therian.speciesId, name: therian.speciesId, emoji: '?' },
       rarity: therian.rarity,
       bites: therian.bites,
+      deaths: (therian as any).deaths ?? 0,
       level: u.level,
       xp: u.xp,
       appearance: {
@@ -159,7 +169,7 @@ export default async function LeaderboardPage() {
           <div className="grid grid-cols-2 gap-3">
             {userRank !== null && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex flex-col items-center">
-                <p className="text-[#8B84B0] text-xs mb-1">🦷 Mordidas</p>
+                <p className="text-[#8B84B0] text-xs mb-1">⚔️ Combate</p>
                 <p className="text-amber-400 font-black font-mono text-2xl">#{userRank}</p>
               </div>
             )}

@@ -16,6 +16,7 @@ interface Wallet {
 
 interface Props {
   therian: TherianDTO
+  therians?: TherianDTO[]
   wallet: Wallet
   initialTab?: Tab
   highlightItem?: string
@@ -50,11 +51,12 @@ const RARITY_COLOR: Record<string, string> = {
   MYTHIC:    'text-red-400',
 }
 
-export default function ShopModal({ therian, wallet, initialTab = 'accesorios', highlightItem, onClose, onPurchase }: Props) {
+export default function ShopModal({ therian, therians, wallet, initialTab = 'accesorios', highlightItem, onClose, onPurchase }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>(initialTab)
   const [renameInput, setRenameInput] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameTargetId, setRenameTargetId] = useState<string>(therian.id)
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [eggQty, setEggQty] = useState<Record<string, number>>({})
@@ -83,7 +85,7 @@ export default function ShopModal({ therian, wallet, initialTab = 'accesorios', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itemId, quantity,
-          ...(itemId === 'rename' ? { newName: renameInput.trim() } : {}),
+          ...(itemId === 'rename' ? { newName: renameInput.trim(), therianId: renameTargetId } : {}),
         }),
       })
       const data = await res.json()
@@ -149,15 +151,30 @@ export default function ShopModal({ therian, wallet, initialTab = 'accesorios', 
         </div>
 
         {item.id === 'rename' && renamingId === 'rename' && (
-          <input
-            type="text"
-            value={renameInput}
-            onChange={e => setRenameInput(e.target.value)}
-            placeholder="Nuevo nombre..."
-            maxLength={24}
-            className="w-full rounded-lg bg-white/5 border border-white/10 px-2 py-1 text-xs text-white placeholder-white/30 outline-none focus:border-purple-500/50"
-            autoFocus
-          />
+          <div className="flex flex-col gap-1.5">
+            {therians && therians.length > 1 && (
+              <select
+                value={renameTargetId}
+                onChange={e => setRenameTargetId(e.target.value)}
+                className="w-full rounded-lg bg-white/5 border border-white/10 px-2 py-1 text-xs text-white outline-none focus:border-purple-500/50"
+              >
+                {therians.map(t => (
+                  <option key={t.id} value={t.id} className="bg-[#1A1A2E]">
+                    {t.name ?? t.species.name} ({t.rarity})
+                  </option>
+                ))}
+              </select>
+            )}
+            <input
+              type="text"
+              value={renameInput}
+              onChange={e => setRenameInput(e.target.value)}
+              placeholder="Nuevo nombre..."
+              maxLength={24}
+              className="w-full rounded-lg bg-white/5 border border-white/10 px-2 py-1 text-xs text-white placeholder-white/30 outline-none focus:border-purple-500/50"
+              autoFocus
+            />
+          </div>
         )}
 
         <div className="mt-auto">

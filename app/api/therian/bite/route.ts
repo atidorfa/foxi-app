@@ -7,9 +7,14 @@ import { calculateBattle } from '@/lib/battle/engine'
 
 const COOLDOWN_MS = 3 * 60 * 1000
 
+const RARITY_RANK: Record<string, number> = {
+  COMMON: 0, UNCOMMON: 1, RARE: 2, EPIC: 3, LEGENDARY: 4, MYTHIC: 5,
+}
+const MAX_RARITY_DIFF = 2
+
 const BodySchema = z.object({
-  target_name: z.string().min(1),
   therianId: z.string().optional(),
+  targetName: z.string().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -23,7 +28,6 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'INVALID_BODY' }, { status: 400 })
   }
-  const { target_name } = parsed.data
 
   // Load challenger
   let challenger = parsed.data.therianId
@@ -42,17 +46,43 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Load target
-  const target = await db.therian.findFirst({
-    where: { name: { equals: target_name, mode: 'insensitive' }, status: 'active' },
-  })
-  if (!target) {
-    return NextResponse.json({ error: 'TARGET_NOT_FOUND' }, { status: 404 })
-  }
+  // Build rarity-compatible filter (max 2 tiers apart)
+  const challengerRank = RARITY_RANK[challenger.rarity] ?? 0
+  const compatibleRarities = Object.entries(RARITY_RANK)
+    .filter(([, r]) => Math.abs(r - challengerRank) <= MAX_RARITY_DIFF)
+    .map(([key]) => key)
 
-  // Cannot bite own Therian
-  if (target.id === challenger.id) {
-    return NextResponse.json({ error: 'CANNOT_BITE_SELF' }, { status: 400 })
+  let target
+  if (parsed.data.targetName) {
+    // Fight the previewed target — validate it still exists and rarity is compatible
+    target = await db.therian.findFirst({
+      where: { name: { equals: parsed.data.targetName, mode: 'insensitive' }, status: 'active' },
+    })
+    if (!target) {
+      return NextResponse.json({ error: 'TARGET_NOT_FOUND' }, { status: 404 })
+    }
+    if (target.userId === session.user.id) {
+      return NextResponse.json({ error: 'CANNOT_BITE_SELF' }, { status: 400 })
+    }
+    if (!compatibleRarities.includes(target.rarity)) {
+      return NextResponse.json({ error: 'RARITY_MISMATCH' }, { status: 400 })
+    }
+  } else {
+    // Pick a random compatible target
+    const totalTargets = await db.therian.count({
+      where: { status: 'active', name: { not: null }, userId: { not: session.user.id }, rarity: { in: compatibleRarities } },
+    })
+    if (totalTargets === 0) {
+      return NextResponse.json({ error: 'NO_TARGETS_AVAILABLE' }, { status: 404 })
+    }
+    const skip = Math.floor(Math.random() * totalTargets)
+    target = await db.therian.findFirst({
+      where: { status: 'active', name: { not: null }, userId: { not: session.user.id }, rarity: { in: compatibleRarities } },
+      skip,
+    })
+    if (!target) {
+      return NextResponse.json({ error: 'NO_TARGETS_AVAILABLE' }, { status: 404 })
+    }
   }
 
   const secret = process.env.SERVER_SECRET ?? 'default-secret'
@@ -73,7 +103,6 @@ export async function POST(req: NextRequest) {
   const GOLD_LOSE = 0
   const XP_WIN = 10
 
-  // Fetch user xp/level for level-up computation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dba = db as any
   const userRecord = await dba.user.findUnique({
@@ -92,7 +121,6 @@ export async function POST(req: NextRequest) {
     userUpdate = { ...userUpdate, xp: newXp, level: newLevel }
   }
 
-  // Persist in a transaction
   const [updatedChallenger, updatedTarget] = await db.$transaction(async (tx) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const txa = tx as any
@@ -100,13 +128,12 @@ export async function POST(req: NextRequest) {
     await txa.battleLog.create({
       data: {
         challengerId: challenger!.id,
-        targetId: target.id,
-        winnerId: challengerWon ? challenger!.id : target.id,
+        targetId: target!.id,
+        winnerId: challengerWon ? challenger!.id : target!.id,
         rounds: JSON.stringify(result.rounds),
       },
     })
 
-    // Track bite attempts in actionGains regardless of win/lose (for achievements)
     const gains: Record<string, number> = JSON.parse((challenger as any).actionGains || '{}')
     gains['BITE'] = (gains['BITE'] ?? 0) + 1
 
@@ -115,14 +142,16 @@ export async function POST(req: NextRequest) {
       data: {
         lastBiteAt: new Date(),
         bites: challengerWon ? { increment: 1 } : undefined,
+        deaths: challengerWon ? undefined : { increment: 1 },
         actionGains: JSON.stringify(gains),
       },
     })
 
     const ut = await txa.therian.update({
-      where: { id: target.id },
+      where: { id: target!.id },
       data: {
         bites: challengerWon ? undefined : { increment: 1 },
+        deaths: challengerWon ? { increment: 1 } : undefined,
       },
     })
 

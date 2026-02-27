@@ -28,8 +28,8 @@ function parseEquippedAccessories(raw: string | null): Record<string, string> {
   }
 }
 
-const COOLDOWN_MS = 5 * 60 * 1000 // 5 minutos (mordida)
-const ACTION_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutos (templar)
+const COOLDOWN_MS = 3 * 60 * 1000 // 3 minutos (mordida)
+const ACTION_COOLDOWN_MS = 3 * 60 * 1000 // 3 minutos (templar)
 
 export function xpToNextLevel(level: number): number {
   return Math.floor(100 * Math.pow(1.5, level - 1))
@@ -80,6 +80,7 @@ export function toTherianDTO(therian: Therian) {
     id: therian.id,
     name: therian.name ?? null,
     bites: therian.bites,
+    deaths: (therian as any).deaths ?? 0,
     species: species
       ? { id: species.id, name: species.name, emoji: species.emoji, lore: species.lore }
       : { id: therian.speciesId, name: therian.speciesId, emoji: '?', lore: '' },

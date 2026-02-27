@@ -42,11 +42,12 @@ export async function POST(req: Request) {
 
   // Load therians and verify ownership
   let rarity: string | null = null
+  let accessoriesToReturn: string[] = []
 
   if (therianIds.length > 0) {
     const therians = await db.therian.findMany({
       where: { id: { in: therianIds }, userId: session.user.id },
-      select: { id: true, rarity: true },
+      select: { id: true, rarity: true, accessories: true },
     })
     if (therians.length !== therianIds.length) {
       return NextResponse.json({ error: 'INVALID_THERIANS' }, { status: 400 })
@@ -54,6 +55,10 @@ export async function POST(req: Request) {
     rarity = therians[0].rarity
     if (!therians.every(t => t.rarity === rarity)) {
       return NextResponse.json({ error: 'RARITY_MISMATCH' }, { status: 400 })
+    }
+    for (const t of therians) {
+      const equipped: string[] = JSON.parse(t.accessories ?? '[]')
+      accessoriesToReturn.push(...equipped)
     }
   }
 
@@ -135,7 +140,7 @@ export async function POST(req: Request) {
     })
   }
 
-  // Delete therians and deduct eggs atomically
+  // Delete therians and deduct eggs atomically; return equipped accessories to inventory
   await db.$transaction([
     ...(therianIds.length > 0
       ? [db.therian.deleteMany({ where: { id: { in: therianIds } } })]
@@ -144,6 +149,13 @@ export async function POST(req: Request) {
       db.inventoryItem.update({
         where: { userId_itemId: { userId: session.user.id, itemId: eu.itemId } },
         data: { quantity: { decrement: eu.qty } },
+      })
+    ),
+    ...accessoriesToReturn.map(itemId =>
+      db.inventoryItem.upsert({
+        where: { userId_itemId: { userId: session.user.id, itemId } },
+        update: { quantity: { increment: 1 } },
+        create: { userId: session.user.id, type: 'ACCESSORY', itemId, quantity: 1 },
       })
     ),
   ])

@@ -13,6 +13,7 @@ interface LeaderboardEntry {
   species: { id: string; name: string; emoji: string }
   rarity: string
   bites: number
+  deaths?: number
   level?: number
   xp?: number
   appearance: {
@@ -266,12 +267,25 @@ function EntryList({
           </div>
 
           {/* Metric */}
-          {mode === 'bites' ? (
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className="text-white font-bold font-mono text-lg">{entry.bites}</span>
-              <span className="text-base">🦷</span>
-            </div>
-          ) : (
+          {mode === 'bites' ? (() => {
+            const deaths = entry.deaths ?? 0
+            const total = entry.bites + deaths
+            const wr = total > 0 ? Math.round((entry.bites / total) * 100) : null
+            return (
+              <div className="text-right flex-shrink-0">
+                <div className="flex items-center gap-1.5 justify-end">
+                  <span className="text-white font-bold font-mono text-base">{entry.bites}</span>
+                  <span className="text-sm">🦷</span>
+                  <span className="text-white/30 font-mono text-xs">·</span>
+                  <span className="text-white/50 font-mono text-base">{deaths}</span>
+                  <span className="text-sm">💀</span>
+                </div>
+                <div className="text-[#8B84B0] font-mono text-xs text-right">
+                  {wr !== null ? `${wr}% WR` : '—'}
+                </div>
+              </div>
+            )
+          })() : (
             <div className="text-right flex-shrink-0">
               <div className="text-white font-bold font-mono text-lg leading-none">Lv.{entry.level ?? 1}</div>
               <div className="text-[#8B84B0] font-mono text-xs">{entry.xp ?? 0} XP</div>

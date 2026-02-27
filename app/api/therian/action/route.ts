@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'MAX_ACTIONS_REACHED' }, { status: 429 })
   }
 
-  // Cooldown de 5 minutos por Therian
-  const ACTION_COOLDOWN_MS = 5 * 60 * 1000
+  // Cooldown de 3 minutos por Therian
+  const ACTION_COOLDOWN_MS = 3 * 60 * 1000
   if (therian.lastActionAt) {
     const elapsed = Date.now() - new Date(therian.lastActionAt).getTime()
     if (elapsed < ACTION_COOLDOWN_MS) {

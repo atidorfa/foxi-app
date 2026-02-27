@@ -61,6 +61,7 @@ model Therian {
 
   name        String?   @unique
   bites       Int       @default(0)
+  deaths      Int       @default(0)
   lastBiteAt  DateTime?
   accessories       String    @default("[]") @db.Text
   status            String    @default("active") // "active" | "capsule"

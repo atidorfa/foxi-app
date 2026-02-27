@@ -111,12 +111,8 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
 
   // Bite popup
   const [showBitePopup, setShowBitePopup] = useState(false)
-  const [bitePhase, setBitePhase] = useState<'search' | 'preview' | 'fighting' | 'result'>('search')
-  const [searchInput, setSearchInput] = useState('')
-  const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
+  const [bitePhase, setBitePhase] = useState<'loading' | 'fighting' | 'result'>('loading')
   const [targetTherian, setTargetTherian] = useState<TherianDTO | null>(null)
-  const [biting, setBiting] = useState(false)
   const [biteError, setBiteError] = useState<string | null>(null)
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null)
   const [biteXpEarned, setBiteXpEarned] = useState<number>(0)
@@ -166,6 +162,8 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
       }
       const timer = setTimeout(() => {
         setTherian(prev => ({ ...prev, canBite: true, nextBiteAt: null }))
+        setTargetTherian(null)
+        setBitePhase('loading')
       }, msLeft)
       return () => clearTimeout(timer)
     }
@@ -275,69 +273,27 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
     })
   }
 
-  const handleBiteSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const name = searchInput.trim()
-    if (!name) return
-    setSearching(true)
-    setSearchError(null)
-    setTargetTherian(null)
-    try {
-      const res = await fetch(`/api/therians/search?name=${encodeURIComponent(name)}`)
-      if (!res.ok) {
-        setSearchError(res.status === 404 ? `No se encontró ningún Therian llamado "${name}".` : 'Error al buscar.')
-        return
-      }
-      setTargetTherian(await res.json())
-      setBitePhase('preview')
-    } catch {
-      setSearchError('Error de conexión.')
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  const handleRandom = async () => {
-    setSearching(true)
-    setSearchError(null)
-    setTargetTherian(null)
-    try {
-      const res = await fetch('/api/therians/random')
-      if (!res.ok) { setSearchError('No hay Therians disponibles para retar.'); return }
-      setTargetTherian(await res.json())
-      setBitePhase('preview')
-    } catch {
-      setSearchError('Error de conexión.')
-    } finally {
-      setSearching(false)
-    }
-  }
-
+  // Click Morder → fight immediately, no preview
   const handleBite = async () => {
-    if (!targetTherian) return
-    setBiting(true)
+    setShowBitePopup(true)
     setBiteError(null)
+
+    // Already fighting/showing result — just reopen
+    if (bitePhase === 'fighting' || bitePhase === 'result') return
+
+    setBitePhase('loading')
     try {
       const res = await fetch('/api/therian/bite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_name: targetTherian.name, therianId: therian.id }),
+        body: JSON.stringify({ therianId: therian.id }),
       })
       const data = await res.json()
       if (!res.ok) {
-        if (res.status === 429) {
-          const diff = Math.max(0, new Date(data.nextBiteAt).getTime() - Date.now())
-          const h = Math.floor(diff / 3600000)
-          const m = Math.floor((diff % 3600000) / 60000)
-          setBiteError(`Cooldown activo. Próxima mordida en ${h}h ${m}m.`)
-        } else if (data.error === 'CANNOT_BITE_SELF') {
-          setBiteError('No puedes morderte a ti mismo.')
-        } else {
-          setBiteError(data.error ?? 'Algo salió mal.')
-        }
-        setBiting(false)
+        setBiteError(data.error ?? 'Algo salió mal.')
         return
       }
+      setTargetTherian(data.target)
       setBattleResult(data.battle)
       setTherian(data.challenger)
       setBitePhase('fighting')
@@ -350,23 +306,18 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
       router.refresh()
     } catch {
       setBiteError('Error de conexión.')
-      setBiting(false)
     }
-  }
-
-  const handleBiteReset = () => {
-    setBitePhase('search')
-    setSearchInput('')
-    setSearchError(null)
-    setBiteError(null)
-    setTargetTherian(null)
-    setBattleResult(null)
-    setBiteXpEarned(0)
   }
 
   const handleBiteClose = () => {
     setShowBitePopup(false)
-    handleBiteReset()
+    setBiteError(null)
+    if (bitePhase === 'result' || bitePhase === 'fighting') {
+      setTargetTherian(null)
+      setBattleResult(null)
+      setBiteXpEarned(0)
+      setBitePhase('loading')
+    }
   }
 
   const handleActionReset = async () => {
@@ -699,6 +650,7 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
             </p>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
               <p className="text-[#8B84B0] text-xs">🦷 {therian.bites} mordidas</p>
+              <p className="text-[#8B84B0] text-xs">💀 {(therian as any).deaths ?? 0} derrotas</p>
               {rank !== undefined && (
                 <p className="text-[#8B84B0] text-xs">🏆 #{rank}</p>
               )}
@@ -712,7 +664,7 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
           {/* Col 1 fila 1: Morder */}
           {therian.canBite ? (
             <button
-              onClick={() => setShowBitePopup(true)}
+              onClick={handleBite}
               className="text-center py-2 rounded-lg border border-red-500/30 bg-red-500/8 text-red-300 hover:bg-red-500/15 hover:border-red-500/50 text-sm font-semibold transition-colors"
             >
               ⚔️ Morder
@@ -928,7 +880,7 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
           onClick={handleBiteClose}
         >
           <div
-            className="bg-[#13131F] border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl"
+            className="bg-[#13131F] border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
@@ -949,110 +901,19 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
               </div>
             )}
 
-            {/* Search phase */}
-            {(bitePhase === 'search' || bitePhase === 'preview') && (
-              <form onSubmit={handleBiteSearch} className="space-y-2">
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={e => setSearchInput(e.target.value)}
-                  placeholder="Nombre del Therian rival..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#4A4468] outline-none focus:border-purple-500/50 focus:bg-white/8 transition-all text-sm"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={searching || !searchInput.trim()}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-white text-sm bg-purple-700 hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {searching ? 'Buscando...' : '🔍 Buscar'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRandom}
-                    disabled={searching}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-white text-sm bg-white/8 border border-white/10 hover:bg-white/12 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {searching ? '···' : '🎲 Aleatorio'}
-                  </button>
-                </div>
-                {searchError && (
-                  <p className="text-red-400 text-xs text-center">{searchError}</p>
-                )}
-              </form>
+            {/* Loading */}
+            {bitePhase === 'loading' && !biteError && (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-red-500 animate-spin" />
+                <p className="text-[#8B84B0] text-sm">Buscando rival...</p>
+              </div>
             )}
 
-            {/* Target preview */}
-            {bitePhase === 'preview' && targetTherian && (() => {
-              const target = targetTherian;
-              return (
-              <div className="rounded-xl border border-white/10 bg-white/3 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-white font-bold">{target.name}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-sm font-semibold ${
-                      target.rarity === 'LEGENDARY' ? 'text-amber-400'
-                      : target.rarity === 'EPIC' ? 'text-purple-400'
-                      : target.rarity === 'RARE' ? 'text-blue-400'
-                      : 'text-slate-400'
-                    }`}>{target.rarity}</div>
-                    <div className="text-[#8B84B0] text-sm">{target.bites} 🦷</div>
-                  </div>
-                </div>
-                {/* Stats comparison */}
-                <div className="space-y-1 text-xs">
-                  <div className="grid grid-cols-[1fr_auto_1fr] text-[10px] uppercase tracking-widest text-white/25 mb-1.5">
-                    <span>Yo</span>
-                    <span />
-                    <span className="text-right">Rival</span>
-                  </div>
-                  {([['vitality','🌿'],['agility','⚡'],['instinct','🌌'],['charisma','✨']] as const).map(([k, icon]) => {
-                    const mine = therian.stats[k]
-                    const theirs = target.stats[k]
-                    const iWin = mine > theirs
-                    const theyWin = theirs > mine
-                    return (
-                      <div key={k} className="grid grid-cols-[1fr_auto_1fr] items-center bg-white/4 rounded-lg px-3 py-1.5">
-                        <span className={`font-mono font-bold ${iWin ? 'text-emerald-400' : theyWin ? 'text-white/40' : 'text-white/60'}`}>
-                          {mine}{iWin && ' ▲'}
-                        </span>
-                        <span className="text-white/30 px-2">{icon}</span>
-                        <span className={`font-mono font-bold text-right ${theyWin ? 'text-red-400' : iWin ? 'text-white/40' : 'text-white/60'}`}>
-                          {theyWin && '▲ '}{theirs}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="flex items-center justify-center gap-3 rounded-lg bg-white/4 py-2 text-xs">
-                  <span className="text-amber-400 font-mono font-semibold">🪙 +10 Oro</span>
-                  <span className="text-white/20">·</span>
-                  <span className="text-purple-400 font-mono font-semibold">✨ +10 XP</span>
-                  <span className="text-white/30 text-[10px]">si ganás</span>
-                </div>
-                {target.id === therian.id && (
-                  <p className="text-amber-400 text-xs text-center">No puedes morderte a ti mismo.</p>
-                )}
-                {biteError && <p className="text-red-400 text-xs text-center">{biteError}</p>}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setBitePhase('search'); setBiteError(null) }}
-                    className="flex-1 py-2.5 rounded-xl text-sm border border-white/10 text-white/50 hover:text-white hover:border-white/20 transition-colors"
-                  >
-                    ↺ Rebuscar
-                  </button>
-                  <button
-                    onClick={handleBite}
-                    disabled={biting || !therian.canBite || target.id === therian.id}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-white text-sm bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {biting ? 'Iniciando...' : therian.canBite ? '🦷 ¡Morder!' : '⏳ Cooldown'}
-                  </button>
-                </div>
-              </div>
-            )})()}
+            {/* Error */}
+            {bitePhase === 'loading' && biteError && (
+              <p className="text-red-400 text-xs text-center">{biteError}</p>
+            )}
+
 
             {/* Battle arena */}
             {(bitePhase === 'fighting' || bitePhase === 'result') && battleResult && targetTherian && (
@@ -1063,6 +924,71 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
                 onComplete={() => setBitePhase('result')}
               />
             )}
+
+            {/* Result: side-by-side stats */}
+            {bitePhase === 'result' && targetTherian && (() => {
+              const target = targetTherian
+              const RARITY_COLOR: Record<string, string> = {
+                COMMON: 'text-slate-400', UNCOMMON: 'text-emerald-400', RARE: 'text-blue-400',
+                EPIC: 'text-purple-400', LEGENDARY: 'text-amber-400', MYTHIC: 'text-red-400',
+              }
+              const myBites = therian.bites
+              const myDeaths = (therian as any).deaths ?? 0
+              const myTotal = myBites + myDeaths
+              const myWR = myTotal > 0 ? Math.round((myBites / myTotal) * 100) : null
+              const theirBites = target.bites
+              const theirDeaths = (target as any).deaths ?? 0
+              const theirTotal = theirBites + theirDeaths
+              const theirWR = theirTotal > 0 ? Math.round((theirBites / theirTotal) * 100) : null
+              const STATS = [['vitality','🌿'],['agility','⚡'],['instinct','🌌'],['charisma','✨']] as const
+              return (
+                <div className="grid grid-cols-2 gap-2">
+                  {/* My stats */}
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1.5">
+                    <div className="mb-2">
+                      <div className="text-white font-bold text-sm truncate">{therian.name ?? 'Yo'}</div>
+                      <div className="text-[#8B84B0] text-xs">{myBites} 🦷 · {myDeaths} 💀</div>
+                      {myWR !== null && <div className="text-emerald-400/70 text-xs font-mono">{myWR}% WR</div>}
+                    </div>
+                    {STATS.map(([k, icon]) => {
+                      const mine = therian.stats[k]
+                      const theirs = target.stats[k]
+                      const iWin = mine > theirs
+                      return (
+                        <div key={k} className="flex items-center justify-between bg-white/4 rounded-lg px-2 py-1">
+                          <span className="text-white/30 text-xs">{icon}</span>
+                          <span className={`font-mono font-bold text-sm ${iWin ? 'text-emerald-400' : mine === theirs ? 'text-white/50' : 'text-white/30'}`}>
+                            {mine}{iWin && ' ▲'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* Rival stats */}
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 space-y-1.5">
+                    <div className="mb-2">
+                      <div className={`text-[10px] font-bold ${RARITY_COLOR[target.rarity] ?? 'text-slate-400'}`}>{target.rarity}</div>
+                      <div className="text-white font-bold text-sm truncate">{target.name}</div>
+                      <div className="text-[#8B84B0] text-xs">{theirBites} 🦷 · {theirDeaths} 💀</div>
+                      {theirWR !== null && <div className="text-red-400/70 text-xs font-mono">{theirWR}% WR</div>}
+                    </div>
+                    {STATS.map(([k, icon]) => {
+                      const mine = therian.stats[k]
+                      const theirs = target.stats[k]
+                      const theyWin = theirs > mine
+                      return (
+                        <div key={k} className="flex items-center justify-between bg-white/4 rounded-lg px-2 py-1">
+                          <span className="text-white/30 text-xs">{icon}</span>
+                          <span className={`font-mono font-bold text-sm ${theyWin ? 'text-red-400' : theirs === mine ? 'text-white/50' : 'text-white/30'}`}>
+                            {theyWin && '▲ '}{theirs}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Result actions */}
             {bitePhase === 'result' && goldEarned !== null && (
@@ -1080,10 +1006,10 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
             {bitePhase === 'result' && (
               <div className="flex gap-2">
                 <button
-                  onClick={handleBiteReset}
+                  onClick={handleBiteClose}
                   className="flex-1 py-2.5 rounded-xl text-sm border border-white/10 text-[#8B84B0] hover:text-white hover:border-white/20 transition-colors"
                 >
-                  Buscar rival
+                  Cerrar
                 </button>
                 <Link
                   href="/leaderboard"
