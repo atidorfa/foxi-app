@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "tutorialProgress" TEXT NOT NULL DEFAULT '{}';
+
+-- AlterTable
+ALTER TABLE "Therian" ADD COLUMN IF NOT EXISTS "deaths" INTEGER NOT NULL DEFAULT 0;
