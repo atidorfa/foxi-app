@@ -13,8 +13,7 @@
     "db:down": "docker compose down",
     "db:migrate": "dotenv -e .env -- prisma migrate deploy",
     "db:studio": "dotenv -e .env -- prisma studio",
-    "db:migrate:prod": "dotenv -e .env.migrate -- prisma migrate deploy",
-    "test:pvp": "npx tsx lib/pvp/__test__/pvp-full.test.ts"
+    "db:migrate:prod": "dotenv -e .env.migrate -- prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

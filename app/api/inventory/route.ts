@@ -3,7 +3,6 @@ import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { EGG_BY_ID } from '@/lib/items/eggs'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
-import { getRuneById } from '@/lib/catalogs/runes'
 
 export type InventoryItemDTO = {
   id: string
@@ -118,25 +117,5 @@ export async function GET() {
     }
   })
 
-  // Fetch user-level rune inventory (earned from PvP weekly/monthly rewards)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dba = db as any
-  const userRunes = await dba.userRuneInventory.findMany({
-    where: { userId, quantity: { gt: 0 } },
-    orderBy: { runeId: 'asc' },
-  }) as Array<{ runeId: string; quantity: number; source: string }>
-
-  const userRuneDTOs = userRunes.map(r => {
-    const rune = getRuneById(r.runeId)
-    return {
-      runeId: r.runeId,
-      quantity: r.quantity,
-      source: r.source,
-      name: rune?.name ?? r.runeId,
-      tier: rune?.tier ?? 1,
-      mod: rune?.mod ?? {},
-    }
-  })
-
-  return NextResponse.json({ items: enriched, userRunes: userRuneDTOs })
+  return NextResponse.json({ items: enriched })
 }

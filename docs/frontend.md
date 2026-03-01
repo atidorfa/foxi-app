@@ -102,114 +102,58 @@ Interfaz para ver y equipar runas. Muestra el inventario de runas del Therian y 
 
 ## PvP — Componentes
 
-### PvpPageClient (`components/pvp/PvpPageClient.tsx`)
-
-Lobby PvP completo. Gestiona:
-- **Vistas**: `'lobby'` | `'fight'` | `'team'`
-- Carga energía, MMR y equipo guardado al montar (`GET /api/pvp/status`, `GET /api/pvp/team`)
-- Sidebar con stats del jugador: energía `⚡ N/10`, MMR, rango, victorias semanales
-- Si no hay equipo guardado → botón "🛡️ Configura tu equipo" (redirige a vista team)
-- Si hay equipo → botón "⚔️ Batalla Clasificatoria" (inicia batalla directamente)
-- Pasa `initialTeamIds` a `PvpRoom` para omitir TeamSetup
-
----
-
 ### PvpRoom (`components/pvp/PvpRoom.tsx`)
 
-Orquestador de fases del PvP:
+Orquestador de estados del PvP:
 
 ```typescript
-type Phase = 'setup' | 'starting' | 'loading_battle' | 'battle' | 'result'
+type Phase = 'setup' | 'loading_battle' | 'battle' | 'result'
 ```
 
-| Fase | Qué muestra | Cuándo |
-|------|-------------|--------|
-| `setup` | `TeamSetup` | Sin equipo / error de inicio |
-| `starting` | Spinner "Buscando rival…" | Auto-llama `POST /api/pvp/start` con equipo guardado |
-| `loading_battle` | Spinner "Cargando batalla…" | Hay `activeBattleId` al montar |
-| `battle` | `BattleField` | Batalla en curso |
-| `result` | Pantalla victoria/derrota + recompensas | Batalla terminada |
+- `setup` → `TeamSetup`
+- `loading_battle` → spinner mientras carga batalla activa
+- `battle` → `BattleField`
+- `result` → pantalla de victoria/derrota
 
-Props clave:
-- `initialTeamIds?: string[]` — si se pasan 3 IDs, salta a `'starting'` y auto-llama la API
-- `onBattleComplete?(won, rewards)` — callback para el lobby
-- `savedTeamIds?, onTeamSaved?` — persistencia del equipo
-- `externalError` — errores propagados a `TeamSetup`
+Al montar, verifica si hay una batalla activa (`activeBattleId` prop) y la carga vía `GET /api/pvp/[id]`.
 
 ---
 
 ### TeamSetup (`components/pvp/TeamSetup.tsx`)
 
-Dos modos de operación:
-
-| Modo | Botón principal | Descripción |
-|------|-----------------|-------------|
-| `'team-setup'` | 💾 Guardar equipo | Solo guarda el equipo predeterminado |
-| `'battle'` | ⚔️ Combatir | Guarda equipo + inicia batalla |
-
-- Grid de cards seleccionables con borde de color por arquetipo
+Selección del equipo de 3 Therians:
+- Grid de cards seleccionables (borde colored al seleccionar)
 - Contador "X/3 seleccionados"
 - Muestra arquetipo, stats y habilidades equipadas
-- `externalError?: string` — muestra errores venidos de la fase `'starting'`
+- Botón "⚔️ Combatir" (disabled < 3) → `POST /api/pvp/start`
 
 ---
 
 ### BattleField (`components/pvp/BattleField.tsx`)
 
-Arena de combate pre-computada con 4 fases visuales.
+Arena de combate. Estructura:
 
 ```
 ┌─────────────────────────────────────┐
-│  Ronda N  [⚔️ T+1/Total]  [1× 2× 4× ⏭] │
-│  ▓▓▓▓▓▓░░░░  barra de progreso     │
+│  COLA DE TURNOS (6 chips)           │
+├────────────────┬────────────────────┤
+│  TU EQUIPO     │   RIVAL            │
+│  Avatar + HP   │  Avatar + HP       │  × 3
 ├─────────────────────────────────────┤
-│  TU EQUIPO      VS      RIVAL       │  ← Phase 1: Arena
-│  HP bar                   HP bar   │
-│  Avatar →         ← Avatar (flip) │  × 3 por lado
-│  Nombre               Nombre      │
-│  [●●] dots         dots [●●]      │  ← Phase 4: inspección
+│  HABILIDADES (turno propio)         │
 ├─────────────────────────────────────┤
-│  Orden: [🌿][⚡][💧] vs [🔥][💧][🌿]│
-├─────────────────────────────────────┤
-│  🌿 Zarpazo de Raíz  ATAQUE        │  ← Phase 2: Ability card
-│  Daño base ×1.0      Lobo › 35 dmg │
-├─────────────────────────────────────┤
-│  Registro (últimas 4 entradas)      │
+│  LOG (últimas 4 entradas)           │
 └─────────────────────────────────────┘
 ```
 
-**Phase 1 — Arena layout:**
-- Panel `bg-[#080810]` con gradientes laterales (azul atacante / rojo defensor)
-- Therians atacantes a la izquierda, defensores a la derecha con `scaleX(-1)` (cara a cara)
-- `ArenaSlot`: barra HP → avatar (con floats) → nombre → dots
+**Flujo de un turno animado:**
 
-**Phase 2 — Active ability card:**
-- Se actualiza en cada turno: emoji de arquetipo, nombre, badge ATAQUE/CURA/EFECTO/PASIVO, descripción por `describeAbility()`, actor y resultado
-
-**Phase 3 — Floating damage numbers:**
-- Al impacto: números `@keyframes floatUp` sobre el avatar objetivo
-- Rojo = daño, Ámbar = bloqueado (`✦N`), Verde = curación, Púrpura = stun
-- Auto-limpian tras 1.2 s
-
-**Phase 4 — Ability inspection dots:**
-- Dots de arquetipo por habilidad equipada en cada slot
-- `title` muestra `Nombre: descripción` al pasar el cursor
-
-**Funciones puras exportadas (testables):**
-
-```typescript
-describeAbility(ab: Ability): string
-// "Daño base ×0.8. Aturde 1 turno"
-
-hpBarColor(current: number, max: number): 'bg-emerald-500' | 'bg-amber-500' | 'bg-red-500'
-// >60% verde, >30% ámbar, ≤30% rojo
-
-resultLines(entry: ActionLogEntry): string[]
-// ["35 daño"] / ["+22 HP"] / ["Aturdido: saltea turno"]
-
-applySnapshot(base: BattleState, snap: TurnSnapshot): BattleState
-// Retorna nuevo BattleState sin mutar el original
-```
+1. Recibir `snapshots[]` del servidor
+2. Para cada snapshot (200ms delay entre ellos):
+   a. Ejecutar animación WAAPI de ataque
+   b. Aplicar flash/shake al objetivo
+   c. Actualizar HP bars y estado visual
+3. Al terminar todos los snapshots → mostrar habilidades del jugador
 
 ---
 
@@ -221,28 +165,47 @@ Las animaciones de batalla usan el **Web Animations API** (`element.animate()`) 
 
 CSS class toggling para re-trigger de keyframes es poco confiable en React 18 (concurrent mode puede batching renders, cancelando la transición). `element.animate()` es imperativo y siempre funciona.
 
-### Refs de DOM
+### Implementación
+
+```typescript
+// En BattleField — useEffect reacciona a animInfo
+useEffect(() => {
+  if (!animInfo) return
+  const { actorId, targetIds, actorSide, isHeal } = animInfo
+
+  // 1. Elevar z-index del atacante para que vuele por encima
+  const actorCard = cardRefs.current.get(actorId)
+  if (actorCard) {
+    actorCard.style.zIndex = '50'
+    setTimeout(() => { actorCard.style.zIndex = '' }, 750)
+  }
+
+  // 2. Flash blanco en el atacante
+  actorCard?.animate([
+    { boxShadow: '0 0 0 2px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.3)' },
+    { boxShadow: 'none' },
+  ], { duration: 450 })
+
+  // 3. Vuelo cross-battlefield usando getBoundingClientRect()
+  const avatarEl = avatarRefs.current.get(actorId)
+  // calcular dx, dy desde centroide del actor hasta centroide(s) del/los objetivo(s)
+  // ... (ver código fuente en BattleField.tsx)
+
+  // 4. Flash/shake en objetivos (sincronizado con el impacto a offset 0.50)
+  const impactDelay = Math.round(animDuration * 0.46)
+  for (const targetId of targetIds) {
+    cardRefs.current.get(targetId)?.animate([/* red/green flash */], { delay: impactDelay })
+  }
+}, [animInfo])
+```
+
+### Refs de elementos DOM
 
 `BattleField` mantiene dos `Map<string, HTMLDivElement>`:
-- `cardRefs` — card contenedora de cada `ArenaSlot`
-- `avatarRefs` — wrapper WAAPI del avatar (**sin** mirror)
+- `cardRefs` — card contenedora de cada slot
+- `avatarRefs` — elemento del avatar (con `willChange: 'transform'`)
 
-El mirror visual (`scaleX(-1)`) se aplica en un div **hijo** del `avatarRef`, de forma que WAAPI puede trasladar el elemento y el flip visual se mantiene compuesto correctamente.
-
-### Secuencia por turno
-
-```
-1. Flash blanco en card del actor
-2. avatarEl.animate() → vuelo hacia el centroide del/los objetivo(s)
-3. Al impacto (offset 0.50): flash rojo/verde en card del objetivo
-4. Si daño: shake horizontal en card del objetivo
-5. Floats de números suben y desaparecen (1.2 s)
-6. HP bars actualizadas con transition-all duration-700
-```
-
-### Floating numbers
-
-Estado `floatNums: Map<therianId, FloatNum[]>`. Se generan al procesar cada snapshot y se limpian con `setTimeout` de 1200 ms. El keyframe `floatUp` está en un `<style>` inline del componente (no requiere cambios en `globals.css`).
+Los `SlotCard` children los registran via props `onCardRef` / `onAvatarRef`.
 
 ---
 

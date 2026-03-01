@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { toTherianDTO } from '@/lib/therian-dto'
 import SignOutButton from '@/components/SignOutButton'
 import CurrencyDisplay from '@/components/CurrencyDisplay'
-import PvpPageClient from '@/components/pvp/PvpPageClient'
+import PvpRoom from '@/components/pvp/PvpRoom'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +39,7 @@ export default async function PvpPage() {
     <div className="min-h-screen bg-[#08080F] relative">
       {/* Fondo */}
       <div className="fixed inset-0 pointer-events-none">
-        <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full blur-[150px] opacity-10"
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[150px] opacity-8"
           style={{ background: 'radial-gradient(ellipse, #C0392B, transparent)' }}
         />
       </div>
@@ -58,8 +57,8 @@ export default async function PvpPage() {
       </nav>
 
       {/* Content */}
-      <main className="relative z-10 max-w-5xl mx-auto px-4 py-8">
-        <PvpPageClient therians={dtos} activeBattleId={activeBattle?.id ?? null} />
+      <main className="relative z-10 max-w-lg mx-auto px-4 py-8">
+        <PvpRoom therians={dtos} activeBattleId={activeBattle?.id ?? null} />
       </main>
     </div>
   )

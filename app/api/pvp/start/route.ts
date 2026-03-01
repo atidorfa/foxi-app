@@ -5,7 +5,6 @@ import { db } from '@/lib/db'
 import { initBattleState } from '@/lib/pvp/engine'
 import type { InitTeamMember } from '@/lib/pvp/engine'
 import { getPaletteById } from '@/lib/catalogs/appearance'
-import { computeEnergy, spendEnergy } from '@/lib/pvp/energy'
 
 const schema = z.object({
   attackerTeamIds: z.array(z.string()).length(3),
@@ -37,27 +36,6 @@ export async function POST(req: NextRequest) {
   if (existing) {
     return NextResponse.json({ error: 'BATTLE_IN_PROGRESS', battleId: existing.id }, { status: 409 })
   }
-
-  // Verificar y deducir energía
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dba = db as any
-  const userEnergy = await dba.user.findUnique({
-    where: { id: userId },
-    select: { pvpEnergy: true, pvpEnergyRegenAt: true },
-  }) as { pvpEnergy: number | null; pvpEnergyRegenAt: Date | null } | null
-
-  const { energy: currentEnergy, regenAt: currentRegenAt } = computeEnergy(
-    userEnergy?.pvpEnergy ?? 10,
-    userEnergy?.pvpEnergyRegenAt ?? null,
-  )
-  if (currentEnergy <= 0) {
-    return NextResponse.json({ error: 'NO_ENERGY', energyRegenAt: currentRegenAt?.toISOString() ?? null }, { status: 429 })
-  }
-  const { energy: newEnergy, regenAt: newRegenAt } = spendEnergy(currentEnergy, currentRegenAt)
-  await dba.user.update({
-    where: { id: userId },
-    data: { pvpEnergy: newEnergy, pvpEnergyRegenAt: newRegenAt },
-  })
 
   // Buscar oponente aleatorio (otro usuario con 3 Therians activos y con nombre)
   const opponents = await db.therian.findMany({

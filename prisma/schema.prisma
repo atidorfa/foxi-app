@@ -28,19 +28,9 @@ model User {
   lastPassiveClaim      DateTime?
   completedCollections  String             @default("[]") @db.Text
   tutorialProgress      String             @default("{}") @db.Text
-  mmr                    Int               @default(1000)
-  peakMmr                Int               @default(1000)
-  weeklyPvpWins          Int               @default(0)
-  weeklyPvpResetAt       DateTime?
-  lastWeeklyChestAt      DateTime?
-  lastMonthlyRewardMonth String?
-  pvpEnergy              Int               @default(10)
-  pvpEnergyRegenAt       DateTime?
-  savedPvpTeam           String?
   therians           Therian[]
   verificationTokens VerificationToken[]
   inventoryItems     InventoryItem[]
-  userRuneInventory  UserRuneInventory[]
 }
 
 model VerificationToken {
@@ -127,17 +117,6 @@ model PvpBattle {
   winnerId     String?  // userId del ganador (null si ganó el defensor)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-}
-
-model UserRuneInventory {
-  id       String   @id @default(uuid())
-  userId   String
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  runeId   String
-  quantity Int      @default(1)
-  source   String   @default("reward") // "weekly" | "monthly" | "gift"
-
-  @@unique([userId, runeId])
 }
 
 model InventoryItem {

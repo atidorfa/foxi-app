@@ -7,66 +7,27 @@ El sistema de combate por turnos enfrenta al equipo del jugador (3 Therians) con
 - `lib/pvp/abilities.ts` — catálogo de habilidades
 - `lib/pvp/engine.ts` — motor de combate (puro, sin DB)
 - `lib/pvp/ai.ts` — decisiones de la IA
-- `lib/pvp/energy.ts` — lógica de regeneración de energía
-- `lib/pvp/mmr.ts` — sistema de MMR, rangos y recompensas
 - `lib/catalogs/auras.ts` — catálogo de 40 auras
 - `app/api/pvp/start/route.ts` — crear batalla
 - `app/api/pvp/[id]/route.ts` — estado actual
-- `app/api/pvp/[id]/action/route.ts` — ejecutar todos los turnos (pre-computado)
-- `app/api/pvp/team/route.ts` — guardar/leer equipo predeterminado
-- `app/api/pvp/status/route.ts` — energía, MMR y recompensas disponibles
-- `app/api/pvp/ranking/route.ts` — ranking global top 10 por MMR
-- `app/api/pvp/rewards/weekly/route.ts` — cofre semanal (GET + POST)
-- `app/api/pvp/rewards/monthly/route.ts` — recompensa mensual (GET + POST)
+- `app/api/pvp/[id]/action/route.ts` — ejecutar acción
 - `app/api/therian/equip-abilities/route.ts` — equipar habilidades
-- `components/pvp/PvpPageClient.tsx` — lobby completo
-- `components/pvp/PvpRoom.tsx` — orquestador de fases
-- `components/pvp/BattleField.tsx` — arena visual 4 fases (pre-computada)
-- `components/pvp/TeamSetup.tsx` — selección/guardado de equipo
-- `lib/pvp/__test__/pvp-full.test.ts` — 287+ tests del motor
-- `lib/pvp/__test__/battlefield-ui.test.ts` — 77 tests de la UI de arena
+- `components/pvp/BattleField.tsx` — interfaz de la arena
+- `components/pvp/TeamSetup.tsx` — selección de equipo (muestra aura activa)
 
 ---
 
 ## Flujo general
 
-El sistema usa batallas **pre-computadas**: el servidor resuelve *todos* los turnos en una sola llamada y devuelve el array completo de snapshots. El cliente los reproduce con delays para la animación visual, pero la batalla ya está resuelta.
-
 ```
-Lobby (PvpPageClient)
-  ├── Sin equipo guardado → "Configura tu equipo" (redirige a TeamSetup)
-  └── Con equipo guardado (3 IDs)
-       ├── Verificar energía (⚡ 0–10)
-       └── Clic "Batalla Clasificatoria"
-             │
-             ▼
-  PvpRoom — fase: 'starting'
-    └── POST /api/pvp/start { attackerTeamIds }
-          │ servidor resuelve TODOS los turnos
-          ▼
-  PvpRoom — fase: 'battle'
-    └── BattleField reproduce snapshots animados
-          │ velocidad configurable (1× / 2× / 4×)
-          ▼
-  PvpRoom — fase: 'result'
-    └── Pantalla victoria/derrota + MMR delta + oro ganado
-```
-
-### Gestión del equipo predeterminado
-
-El usuario guarda un equipo de 3 Therians en su perfil (`savedPvpTeam` en User). Este equipo se usa automáticamente al iniciar batalla. Si uno de los Therians del equipo guardado ya no está activo (fusionado, liberado), se filtra y el equipo queda incompleto hasta que el usuario lo actualice.
-
-```
-GET /api/pvp/team  → { teamIds, therians[] }
-POST /api/pvp/team { teamIds: [id1, id2, id3] } → { ok, teamIds }
-```
-
-### Energía PvP
-
-Cada batalla consume 1 energía. La energía se regenera automáticamente a razón de 1 unidad cada 2 horas, hasta un máximo de 10. Si `pvpEnergy = 0`, no se puede iniciar batalla.
-
-```
-GET /api/pvp/status → { energy, energyMax, energyRegenAt, mmr, rank, ... }
+1. TeamSetup → seleccionar 3 Therians
+2. POST /api/pvp/start → { battleId, state }
+3. BattleField muestra estado inicial
+4. Si turno del jugador → mostrar habilidades
+5. POST /api/pvp/[id]/action → { snapshots[], state }
+6. BattleField reproduce snapshots animados (200ms delay entre turnos)
+7. Repetir hasta state.status === 'completed'
+8. Mostrar pantalla de resultado (victoria/derrota)
 ```
 
 ---
@@ -418,93 +379,6 @@ Los slots se ordenan al inicio por `effectiveAgility` descendente. El orden no c
 
 ## Persistencia
 
-`PvpBattle.state` almacena el `BattleState` serializado como JSON. Tras cada llamada a `/api/pvp/[id]/action`, se actualiza con el estado final. Las batallas completadas permanecen en DB (status `'completed'`).
+`PvpBattle.state` almacena el `BattleState` serializado como JSON. Tras cada acción del jugador, se actualiza con el nuevo estado completo. Las batallas completadas permanecen en DB (status `'completed'`).
 
 Un usuario solo puede tener **una batalla activa** a la vez. Si existe una al cargar `/pvp`, se recarga automáticamente.
-
----
-
-## Sistema MMR y Rangos
-
-El MMR (Match Making Rating) determina el rango competitivo del usuario.
-
-| Rango | MMR mínimo |
-|-------|------------|
-| Bronce | 0 |
-| Plata | 600 |
-| Oro | 1000 |
-| Platino | 1400 |
-| Diamante | 1800 |
-| Maestro | 2200 |
-
-### Variación de MMR por batalla
-
-```
-Victoria: +20 MMR  (−5 si el oponente tiene mucho menos MMR)
-Derrota:  −15 MMR  (mínimo 0)
-Oro ganado por victoria: 50–100 gold según rango del rival
-```
-
-### Ranking
-
-`GET /api/pvp/ranking` devuelve el top 10 global por MMR + la posición del usuario autenticado si no está en el top.
-
-```json
-{
-  "entries": [
-    { "position": 1, "name": "Usuario", "mmr": 2500, "rank": "Maestro", "isCurrentUser": false }
-  ],
-  "currentUser": { "position": 15, "mmr": 1200, "rank": "Oro", "isCurrentUser": true }
-}
-```
-
----
-
-## Sistema de Recompensas
-
-### Cofre Semanal
-
-Al acumular **15 victorias en la semana**, se desbloquea el cofre semanal (claimable una vez por período).
-
-`GET /api/pvp/rewards/weekly` — Estado del cofre (disponible, ya reclamado, victorias actuales).
-
-`POST /api/pvp/rewards/weekly` — Reclamar cofre. Otorga:
-- 800 gold
-- 1 huevo (tier según rango)
-- 2 runas aleatorias del pool T1
-
-```json
-{ "gold": 800, "egg": "egg_rare", "runes": ["v_1", "a_2"] }
-```
-
-**Errores:**
-| Código | Status |
-|--------|--------|
-| `NOT_ENOUGH_WINS` | 400 — victorias insuficientes |
-| `ALREADY_CLAIMED` | 409 — ya reclamado en este período |
-
-### Recompensa Mensual
-
-Al inicio de cada mes se puede reclamar una recompensa basada en el **rango pico** alcanzado durante el mes.
-
-`GET /api/pvp/rewards/monthly` — Estado de la recompensa mensual.
-
-`POST /api/pvp/rewards/monthly` — Reclamar recompensa mensual.
-
----
-
-## Tests
-
-```bash
-# Motor de combate (287+ tests)
-npx tsx lib/pvp/__test__/pvp-full.test.ts
-
-# UI de arena — funciones puras (77 tests)
-npx tsx lib/pvp/__test__/battlefield-ui.test.ts
-```
-
-Los tests de battlefield-ui cubren:
-- `describeAbility()` — descripción legible para los 16 tipos de efecto
-- `hpBarColor()` — umbrales de color de barra de HP
-- `resultLines()` — formateo de resultados de turno
-- `applySnapshot()` — aplicación correcta de snapshots con edge cases

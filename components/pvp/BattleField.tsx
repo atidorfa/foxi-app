@@ -2,23 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { BattleState, TurnSlot, TurnSnapshot, ActionLogEntry, AvatarSnapshot } from '@/lib/pvp/types'
-import type { Ability } from '@/lib/pvp/types'
-import { ABILITY_BY_ID } from '@/lib/pvp/abilities'
 import TherianAvatar from '@/components/TherianAvatar'
 import type { TherianDTO } from '@/lib/therian-dto'
-
-export interface BattleRewards {
-  mmrDelta: number
-  newMmr: number
-  rank: string
-  goldEarned: number
-  weeklyPvpWins: number
-}
 
 interface Props {
   battleId: string
   initialState: BattleState
-  onComplete: (won: boolean, rewards?: BattleRewards) => void
+  onComplete: (won: boolean) => void
 }
 
 interface AnimInfo {
@@ -29,83 +19,13 @@ interface AnimInfo {
   frame:     number
 }
 
-interface FloatNum {
-  id:        number
-  therianId: string
-  label:     string
-  color:     string
-}
-
-interface ActiveAbilityInfo {
-  abilityId:   string
-  abilityName: string
-  archetype:   string
-  actorName:   string | null
-  resultLines: string[]
-}
-
-// ─── Pure helpers (exported for tests) ────────────────────────────────────────
-
-export function describeAbility(ab: Ability): string {
-  const e = ab.effect
-  const parts: string[] = []
-  if (e.damage  !== undefined) parts.push(`Daño base ×${e.damage}`)
-  if (e.heal    !== undefined) parts.push(`Curación base ×${e.heal}`)
-  if (e.stun    !== undefined) parts.push(`Aturde ${e.stun} turno${e.stun !== 1 ? 's' : ''}`)
-  if (e.buff)    parts.push(`+${Math.round(e.buff.pct * 100)}% ${e.buff.stat} por ${e.buff.turns} turnos`)
-  if (e.debuff)  parts.push(`${Math.round(e.debuff.pct * 100)}% ${e.debuff.stat} por ${e.debuff.turns} turnos`)
-  if (e.reflect) parts.push(`Refleja ${Math.round(e.reflect * 100)}% del daño recibido`)
-  if (e.damageReduction) parts.push(`Reduce ${Math.round(e.damageReduction * 100)}% el daño recibido`)
-  if (e.tiebreaker) parts.push('Actúa primero en empates de velocidad')
-  return parts.join('. ')
-}
-
-export function hpBarColor(current: number, max: number): 'bg-emerald-500' | 'bg-amber-500' | 'bg-red-500' {
-  const pct = max > 0 ? current / max : 0
-  if (pct > 0.6) return 'bg-emerald-500'
-  if (pct > 0.3) return 'bg-amber-500'
-  return 'bg-red-500'
-}
-
-export function resultLines(entry: ActionLogEntry): string[] {
-  if (entry.abilityId === 'stun') return ['Aturdido: saltea turno']
-  const lines = entry.results.map(r => {
-    if (r.damage !== undefined) return r.blocked ? `Bloqueado (${r.damage} dmg)` : `${r.damage} daño${r.died ? ' 💀' : ''}`
-    if (r.heal   !== undefined) return `+${r.heal} HP`
-    if (r.stun   !== undefined) return `Aturde ${r.stun}t`
-    if (r.effect !== undefined) return r.effect
-    return ''
-  }).filter(Boolean)
-  // If multi-target, add total damage summary
-  if (entry.results.length > 1) {
-    const total = entry.results.reduce((s, r) => s + (r.damage ?? 0), 0)
-    if (total > 0) lines.push(`Total: ${total} daño`)
-  }
-  return lines
-}
-
-export function applySnapshot(base: BattleState, snap: TurnSnapshot): BattleState {
-  return {
-    ...base,
-    turnIndex: snap.turnIndex,
-    round:     snap.round,
-    status:    snap.status,
-    winnerId:  snap.winnerId,
-    slots: base.slots.map(slot => {
-      const s = snap.slots.find(ss => ss.therianId === slot.therianId)
-      if (!s) return slot
-      return { ...slot, currentHp: s.currentHp, isDead: s.isDead, effects: s.effects, cooldowns: s.cooldowns, effectiveAgility: s.effectiveAgility }
-    }),
-  }
-}
-
-// ─── Archetype helpers ────────────────────────────────────────────────────────
+// ─── Archetype helpers ──────────────────────────────────────────────────────
 
 const ARCH_META = {
   forestal:  { emoji: '🌿', border: 'border-emerald-500/50', text: 'text-emerald-400', bg: 'bg-emerald-500/15' },
-  electrico: { emoji: '⚡', border: 'border-yellow-500/50',  text: 'text-yellow-400',  bg: 'bg-yellow-500/15'  },
-  acuatico:  { emoji: '💧', border: 'border-blue-500/50',    text: 'text-blue-400',    bg: 'bg-blue-500/15'    },
-  volcanico: { emoji: '🔥', border: 'border-orange-500/50',  text: 'text-orange-400',  bg: 'bg-orange-500/15'  },
+  electrico: { emoji: '⚡', border: 'border-yellow-500/50',  text: 'text-yellow-400',  bg: 'bg-yellow-500/15' },
+  acuatico:  { emoji: '💧', border: 'border-blue-500/50',    text: 'text-blue-400',    bg: 'bg-blue-500/15'  },
+  volcanico: { emoji: '🔥', border: 'border-orange-500/50',  text: 'text-orange-400',  bg: 'bg-orange-500/15'},
 } as const
 
 function archMeta(archetype: string) {
@@ -113,7 +33,10 @@ function archMeta(archetype: string) {
 }
 
 const AURA_LABEL_FALLBACK: Record<string, string> = {
-  hp: '🌿 Vitalidad', damage: '🔥 Combate', defense: '💧 Escudo', agility: '⚡ Celeridad',
+  hp:      '🌿 Vitalidad',
+  damage:  '🔥 Combate',
+  defense: '💧 Escudo',
+  agility: '⚡ Celeridad',
 }
 
 function getAuraLabel(aura: { name?: string; type?: string }): string {
@@ -127,17 +50,18 @@ const SPEED_OPTIONS = [
   { label: '4×', ms: 350  },
 ]
 
-// Module-level counter for unique float number IDs
-let floatCounter = 0
-
-// ─── SlotAvatar ───────────────────────────────────────────────────────────────
+// ─── Avatar ──────────────────────────────────────────────────────────────────
 
 function SlotAvatar({ slot }: { slot: TurnSlot }) {
   const snap: AvatarSnapshot | undefined = slot.avatarSnapshot
   const meta = archMeta(slot.archetype)
 
   if (!snap) {
-    return <div className="w-16 h-16 flex items-center justify-center text-4xl">{meta.emoji}</div>
+    return (
+      <div className="w-16 h-16 flex items-center justify-center text-4xl">
+        {meta.emoji}
+      </div>
+    )
   }
 
   const fakeDto = {
@@ -158,11 +82,11 @@ function SlotAvatar({ slot }: { slot: TurnSlot }) {
   return <TherianAvatar therian={fakeDto} size={64} />
 }
 
-// ─── HpBar ────────────────────────────────────────────────────────────────────
+// ─── HP Bar ──────────────────────────────────────────────────────────────────
 
 function HpBar({ current, max }: { current: number; max: number }) {
-  const pct   = Math.max(0, (current / max) * 100)
-  const color = hpBarColor(current, max)
+  const pct = Math.max(0, (current / max) * 100)
+  const color = pct > 60 ? 'bg-emerald-500' : pct > 30 ? 'bg-amber-500' : 'bg-red-500'
   return (
     <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
       <div className={`h-full ${color} transition-all duration-700`} style={{ width: `${pct}%` }} />
@@ -170,11 +94,11 @@ function HpBar({ current, max }: { current: number; max: number }) {
   )
 }
 
-// ─── TurnQueueBar ─────────────────────────────────────────────────────────────
+// ─── Turn Queue Bar ──────────────────────────────────────────────────────────
 
-function TurnQueueBar({ slots, turnIndex, actorIndex }: {
-  slots: TurnSlot[]; turnIndex: number; actorIndex: number
-}) {
+function TurnQueueBar({
+  slots, turnIndex, actorIndex,
+}: { slots: TurnSlot[]; turnIndex: number; actorIndex: number }) {
   const attackers = slots.filter(s => s.side === 'attacker')
   const defenders = slots.filter(s => s.side === 'defender')
 
@@ -202,182 +126,98 @@ function TurnQueueBar({ slots, turnIndex, actorIndex }: {
   }
 
   return (
-    <div className="flex items-center justify-center gap-1.5">
+    <div className="flex items-center justify-center gap-1">
       {attackers.map(s => <Chip key={s.therianId} slot={s} />)}
-      <span className="text-white/20 text-[10px] font-bold mx-1">vs</span>
+      <span className="text-white/20 text-xs mx-1.5">|</span>
       {defenders.map(s => <Chip key={s.therianId} slot={s} />)}
     </div>
   )
 }
 
-// ─── ArenaSlot ────────────────────────────────────────────────────────────────
+// ─── Slot Card ───────────────────────────────────────────────────────────────
 
-function ArenaSlot({ slot, isActor, isNext, onCardRef, onAvatarRef, mirrored, floats }: {
+function SlotCard({
+  slot, isActor, isNext, onCardRef, onAvatarRef,
+}: {
   slot:        TurnSlot
   isActor:     boolean
   isNext:      boolean
   onCardRef:   (el: HTMLDivElement | null) => void
   onAvatarRef: (el: HTMLDivElement | null) => void
-  mirrored:    boolean
-  floats:      FloatNum[]
 }) {
   const meta = archMeta(slot.archetype)
-
-  const borderClass = slot.isDead
-    ? 'border-white/5 bg-white/2'
-    : isActor
-      ? `${meta.border} ${meta.bg} ring-2 ring-white/50 shadow-[0_0_14px_rgba(255,255,255,0.08)]`
-      : isNext
-        ? `${meta.border} bg-white/5 ring-1 ring-white/15`
-        : 'border-white/10 bg-white/3'
 
   return (
     <div
       ref={onCardRef}
-      className={`relative rounded-xl border p-2 transition-all duration-500 ${borderClass} ${slot.isDead ? 'opacity-30 grayscale' : ''}`}
+      className={`relative rounded-xl border p-2 transition-colors transition-opacity duration-500 ${
+        slot.isDead
+          ? 'opacity-20 grayscale border-white/5 bg-white/3'
+          : isActor
+            ? `${meta.border} ${meta.bg} ring-2 ring-white/60 shadow-[0_0_18px_rgba(255,255,255,0.1)]`
+            : isNext
+              ? `${meta.border} bg-white/5 ring-1 ring-white/15`
+              : 'border-white/10 bg-white/3'
+      }`}
     >
-      {/* HP bar + text */}
+      {/* Nombre + indicador de turno */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span className="text-sm leading-none">{meta.emoji}</span>
+        <span className="text-xs font-medium text-white/80 truncate flex-1">
+          {slot.name ?? slot.archetype}
+        </span>
+        {isActor && !slot.isDead && (
+          <span className="text-[11px] font-bold text-white/80 animate-pulse">⚔</span>
+        )}
+      </div>
+
+      {/* HP */}
       <HpBar current={slot.currentHp} max={slot.maxHp} />
-      <div className="flex justify-between items-center mt-0.5 mb-1.5">
-        <span className="text-[9px] text-white/30">{slot.currentHp}/{slot.maxHp}</span>
+      <div className="flex justify-between mt-1 mb-2">
+        <span className="text-[10px] text-white/30">{slot.currentHp}/{slot.maxHp}</span>
         {slot.effects.length > 0 && (
-          <span className="text-[10px]">
+          <span className="text-[10px] text-amber-400/60">
             {slot.effects.map(e => e.type === 'stun' ? '😵' : e.type === 'buff' ? '↑' : '↓').join('')}
           </span>
         )}
       </div>
 
-      {/* Avatar with float numbers — outer div for float anchor */}
-      <div className="relative flex justify-center">
-        {/* Float numbers — absolute above avatar, not mirrored */}
-        {floats.length > 0 && (
-          <div
-            className="absolute inset-x-0 flex flex-col items-center pointer-events-none"
-            style={{ bottom: '100%', zIndex: 20 }}
-          >
-            {floats.map(f => (
-              <span
-                key={f.id}
-                className={`text-sm font-extrabold leading-none select-none ${f.color}`}
-                style={{ animation: 'floatUp 1.2s ease-out forwards' }}
-              >
-                {f.label}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* WAAPI wrapper — translated by animation, does NOT have mirror so dx/dy are correct */}
-        <div ref={onAvatarRef} style={{ willChange: 'transform' }}>
-          {/* Mirror applied only to the visual content */}
-          <div style={{ transform: mirrored ? 'scaleX(-1)' : 'none' }}
-               className={slot.isDead ? 'opacity-30' : ''}>
-            <SlotAvatar slot={slot} />
-          </div>
-        </div>
-      </div>
-
-      {/* Name */}
-      <p className="text-[10px] text-center text-white/60 mt-1.5 truncate font-medium">
-        {slot.name ?? slot.archetype}
-      </p>
-
-      {/* Equipped ability dots (Phase 4: hover to inspect) */}
-      {slot.equippedAbilities.length > 0 && (
-        <div className="flex justify-center gap-1 mt-1.5">
-          {slot.equippedAbilities.slice(0, 4).map(id => {
-            const ab = ABILITY_BY_ID[id]
-            if (!ab) return null
-            const abMeta = archMeta(ab.archetype)
-            return (
-              <div
-                key={id}
-                className={`w-4 h-4 rounded-full border flex items-center justify-center text-[8px] leading-none cursor-default ${abMeta.border} ${abMeta.bg} hover:scale-125 transition-transform`}
-                title={`${ab.name}: ${describeAbility(ab)}`}
-              >
-                {abMeta.emoji}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Actor turn indicator badge */}
-      {isActor && !slot.isDead && (
-        <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-lg">
-          <span className="text-[9px] font-black text-black leading-none">⚔</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── ActiveAbilityCard ────────────────────────────────────────────────────────
-
-function ActiveAbilityCard({ info }: { info: ActiveAbilityInfo | null }) {
-  if (!info) {
-    return (
-      <div className="h-16 rounded-xl border border-white/5 bg-white/2 flex items-center justify-center">
-        <p className="text-white/15 text-xs">Esperando turno...</p>
-      </div>
-    )
-  }
-
-  const meta = archMeta(info.archetype)
-  const ab   = ABILITY_BY_ID[info.abilityId]
-  const desc = ab ? describeAbility(ab) : ''
-
-  let typeLabel = ''
-  if (ab) {
-    if (ab.type === 'passive') typeLabel = 'PASIVO'
-    else if (ab.effect.heal !== undefined) typeLabel = 'CURA'
-    else if (ab.effect.damage !== undefined) typeLabel = 'ATAQUE'
-    else typeLabel = 'EFECTO'
-  }
-
-  return (
-    <div className={`rounded-xl border p-3 ${meta.border} ${meta.bg} transition-all duration-300`}>
-      <div className="flex items-start justify-between gap-2">
-        {/* Left: archetype + name + description */}
-        <div className="flex items-start gap-2 min-w-0 flex-1">
-          <span className="text-xl leading-none flex-shrink-0 mt-0.5">{meta.emoji}</span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`text-sm font-bold ${meta.text}`}>{info.abilityName}</span>
-              {typeLabel && (
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${meta.border} ${meta.text} opacity-60`}>
-                  {typeLabel}
-                </span>
-              )}
-            </div>
-            {desc && (
-              <p className="text-[10px] text-white/35 mt-0.5 leading-snug">{desc}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Right: actor + results */}
-        <div className="text-right flex-shrink-0 min-w-[80px]">
-          <p className="text-[9px] text-white/25 mb-0.5">{info.actorName ?? '?'}</p>
-          {info.resultLines.slice(0, 2).map((line, i) => (
-            <p key={i} className="text-xs font-semibold text-white/65 leading-snug">{line}</p>
-          ))}
-        </div>
+      {/* Avatar — ref para movimiento de ataque */}
+      <div
+        ref={onAvatarRef}
+        className={`flex justify-center ${slot.isDead ? 'opacity-30' : ''}`}
+        style={{ willChange: 'transform' }}
+      >
+        <SlotAvatar slot={slot} />
       </div>
     </div>
   )
 }
 
-// ─── LogLine ──────────────────────────────────────────────────────────────────
+// ─── Log ─────────────────────────────────────────────────────────────────────
 
 function LogLine({ entry, isNew }: { entry: ActionLogEntry; isNew: boolean }) {
-  const lines = resultLines(entry)
-  const line  = lines[0] ?? ''
-  let color = 'text-white/40'
-  if (line.includes('HP'))       color = 'text-emerald-400/70'
-  else if (line.includes('Bloqueado')) color = 'text-amber-400/60'
-  else if (line.includes('daño'))      color = 'text-red-400/70'
-  else if (line.includes('Aturde') || line.includes('Aturdido')) color = 'text-purple-400/60'
+  const first = entry.results[0]
+  let text = '', color = 'text-white/40'
+
+  if (entry.abilityId === 'stun') {
+    text = 'aturdido'; color = 'text-white/30'
+  } else if (first) {
+    if (first.damage !== undefined) {
+      text  = first.blocked ? `bloqueó (${first.damage})` : `${first.damage} dmg${first.died ? ' 💀' : ''}`
+      color = first.blocked ? 'text-amber-400/60' : 'text-red-400/70'
+    } else if (first.heal !== undefined) {
+      text = `+${first.heal} HP`; color = 'text-emerald-400/70'
+    } else if (first.stun) {
+      text = `aturde ${first.stun}t`; color = 'text-purple-400/60'
+    } else if (first.effect) {
+      text = first.effect; color = 'text-yellow-400/60'
+    }
+    if (entry.results.length > 1) {
+      const total = entry.results.reduce((s, r) => s + (r.damage ?? 0), 0)
+      if (total > 0) { text = `${total} total${entry.results.some(r => r.died) ? ' 💀' : ''}`; color = 'text-red-400/70' }
+    }
+  }
 
   return (
     <div className={`flex items-center gap-1.5 text-xs ${isNew ? 'opacity-100' : 'opacity-45'}`}>
@@ -386,31 +226,45 @@ function LogLine({ entry, isNew }: { entry: ActionLogEntry; isNew: boolean }) {
       <span className="text-white/20">›</span>
       <span className="text-white/45 flex-shrink-0 truncate max-w-[64px]">{entry.abilityName}</span>
       <span className="text-white/20">›</span>
-      <span className={`${color} truncate flex-1`}>{line}</span>
+      <span className={`${color} truncate flex-1`}>{text}</span>
     </div>
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function applySnapshot(base: BattleState, snap: TurnSnapshot): BattleState {
+  return {
+    ...base,
+    turnIndex: snap.turnIndex,
+    round:     snap.round,
+    status:    snap.status,
+    winnerId:  snap.winnerId,
+    slots: base.slots.map(slot => {
+      const s = snap.slots.find(ss => ss.therianId === slot.therianId)
+      if (!s) return slot
+      return { ...slot, currentHp: s.currentHp, isDead: s.isDead, effects: s.effects, cooldowns: s.cooldowns, effectiveAgility: s.effectiveAgility }
+    }),
+  }
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function BattleField({ battleId, initialState, onComplete }: Props) {
-  const [displayState,   setDisplayState]   = useState<BattleState>(initialState)
-  const [snapshots,      setSnapshots]      = useState<TurnSnapshot[]>([])
-  const [step,           setStep]           = useState(-1)
-  const [speedIdx,       setSpeedIdx]       = useState(0)
-  const [fetching,       setFetching]       = useState(true)
-  const [error,          setError]          = useState<string | null>(null)
-  const [currentLog,     setCurrentLog]     = useState<ActionLogEntry[]>([])
-  const [actorIndex,     setActorIndex]     = useState(initialState.turnIndex)
-  const [animInfo,       setAnimInfo]       = useState<AnimInfo | null>(null)
-  const [activeAbility,  setActiveAbility]  = useState<ActiveAbilityInfo | null>(null)
-  const [floatNums,      setFloatNums]      = useState<Map<string, FloatNum[]>>(new Map())
+  const [displayState, setDisplayState] = useState<BattleState>(initialState)
+  const [snapshots, setSnapshots]       = useState<TurnSnapshot[]>([])
+  const [step, setStep]                 = useState(-1)
+  const [speedIdx, setSpeedIdx]         = useState(0)
+  const [fetching, setFetching]         = useState(true)
+  const [error, setError]               = useState<string | null>(null)
+  const [currentLog, setCurrentLog]     = useState<ActionLogEntry[]>([])
+  const [actorIndex, setActorIndex]     = useState(initialState.turnIndex)
+  const [animInfo, setAnimInfo]         = useState<AnimInfo | null>(null)
 
-  const finalStateRef = useRef<BattleState>(initialState)
-  const snapshotsRef  = useRef<TurnSnapshot[]>([])
-  const completedRef  = useRef(false)
-  const baseSlotsRef  = useRef(initialState.slots)
-  const rewardsRef    = useRef<BattleRewards | undefined>(undefined)
+  const finalStateRef  = useRef<BattleState>(initialState)
+  const snapshotsRef   = useRef<TurnSnapshot[]>([])
+  const completedRef   = useRef(false)
+  const baseSlotsRef   = useRef(initialState.slots)
 
   // DOM refs para WAAPI
   const cardRefs   = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -421,13 +275,13 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
   const myAura     = displayState.auras.find(a => a.side === 'attacker')
   const enemyAura  = displayState.auras.find(a => a.side === 'defender')
 
-  // ── Fetch all turns at once ────────────────────────────────────────────────
+  // ── Fetch completo ────────────────────────────────────────────────────────
   useEffect(() => {
     if (initialState.status === 'completed') {
       setFetching(false)
       if (!completedRef.current) {
         completedRef.current = true
-        setTimeout(() => onComplete(initialState.winnerId !== null, rewardsRef.current), 3000)
+        setTimeout(() => onComplete(initialState.winnerId !== null), 3000)
       }
       return
     }
@@ -442,12 +296,6 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
         finalStateRef.current = data.state as BattleState
         snapshotsRef.current  = data.snapshots as TurnSnapshot[]
         baseSlotsRef.current  = (data.state as BattleState).slots
-        if (data.mmrDelta !== undefined) {
-          rewardsRef.current = {
-            mmrDelta: data.mmrDelta, newMmr: data.newMmr, rank: data.rank,
-            goldEarned: data.goldEarned, weeklyPvpWins: data.weeklyPvpWins,
-          }
-        }
         setSnapshots(data.snapshots)
         setFetching(false)
         setStep(0)
@@ -455,7 +303,7 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
       .catch(() => setError('Error al cargar la batalla.'))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Step-by-step animation loop ───────────────────────────────────────────
+  // ── Loop de animación paso a paso ─────────────────────────────────────────
   useEffect(() => {
     if (fetching || step < 0) return
     const snaps = snapshotsRef.current
@@ -470,59 +318,24 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
       setDisplayState(prev => applySnapshot(prev, snap))
       setCurrentLog(prev => [...prev, snap.logEntry])
 
-      // Active ability card — Phase 2
-      const actorBase = baseSlotsRef.current[snap.actorIndex]
-      setActiveAbility({
-        abilityId:   snap.logEntry.abilityId,
-        abilityName: snap.logEntry.abilityName,
-        archetype:   actorBase?.archetype ?? 'forestal',
-        actorName:   snap.logEntry.actorName,
-        resultLines: resultLines(snap.logEntry),
-      })
-
-      // Float damage numbers — Phase 3
       const isStun    = snap.logEntry.abilityId === 'stun'
       const hasTarget = snap.logEntry.targetIds.length > 0 && !isStun
       const isHeal    = hasTarget && snap.logEntry.results[0]?.heal !== undefined
-
-      if (hasTarget) {
-        const newFloats = new Map<string, FloatNum[]>()
-        for (const result of snap.logEntry.results) {
-          let label = ''
-          let color = 'text-red-400'
-          if (result.damage !== undefined) {
-            label = result.blocked ? `✦${result.damage}` : `${result.damage}`
-            color = result.blocked ? 'text-amber-400' : 'text-red-400'
-          } else if (result.heal !== undefined) {
-            label = `+${result.heal}`
-            color = 'text-emerald-400'
-          } else if (result.stun) {
-            label = '😵'
-            color = 'text-purple-400'
-          }
-          if (label) {
-            const id = ++floatCounter
-            const prev = newFloats.get(result.targetId) ?? []
-            newFloats.set(result.targetId, [...prev, { id, therianId: result.targetId, label, color }])
-          }
-        }
-        setFloatNums(newFloats)
-        setTimeout(() => setFloatNums(new Map()), 1200)
-      }
+      const actorBase = baseSlotsRef.current[snap.actorIndex]
 
       setAnimInfo(hasTarget && actorBase ? {
         actorId:   actorBase.therianId,
         targetIds: snap.logEntry.targetIds,
         actorSide: actorBase.side,
         isHeal,
-        frame:     step,
+        frame: step,
       } : null)
 
       const next = step + 1
       if (next >= snaps.length) {
         if (!completedRef.current) {
           completedRef.current = true
-          setTimeout(() => onComplete(snap.winnerId !== null, rewardsRef.current), 2500)
+          setTimeout(() => onComplete(snap.winnerId !== null), 2500)
         }
       } else {
         setStep(next)
@@ -531,7 +344,7 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
     return () => clearTimeout(timer)
   }, [step, fetching, speedIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── WAAPI: avatar lunges toward target ────────────────────────────────────
+  // ── WAAPI: cruce real hacia el objetivo ───────────────────────────────────
   useEffect(() => {
     if (!animInfo) return
     const { actorId, targetIds, actorSide, isHeal } = animInfo
@@ -539,21 +352,26 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
     const actorCardEl = cardRefs.current.get(actorId)
     const avatarEl    = avatarRefs.current.get(actorId)
 
-    // Elevate z-index so the card crosses above siblings
+    // Elevar z-index de la card atacante para que cruce por encima de las demás
     if (actorCardEl) {
       actorCardEl.style.position = 'relative'
       actorCardEl.style.zIndex   = '50'
       setTimeout(() => { if (actorCardEl) actorCardEl.style.zIndex = '' }, 750)
+    }
+
+    // Flash blanco en la card atacante (señal visual de "está atacando")
+    if (actorCardEl) {
       actorCardEl.animate(
         [
-          { boxShadow: '0 0 0 2px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.3)', offset: 0 },
-          { boxShadow: '0 0 0 1px rgba(255,255,255,0.2)', offset: 0.40 },
-          { boxShadow: 'none', offset: 1 },
+          { boxShadow: '0 0 0 2px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.3)', offset: 0    },
+          { boxShadow: '0 0 0 1px rgba(255,255,255,0.2)',                                  offset: 0.40 },
+          { boxShadow: 'none',                                                              offset: 1    },
         ],
         { duration: 450 },
       )
     }
 
+    // Calcular destino del avatar hacia el centro promedio de los objetivos
     const animDuration = isHeal ? 520 : 680
     if (avatarEl && targetIds.length > 0) {
       const sourceRect = avatarEl.getBoundingClientRect()
@@ -572,25 +390,28 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
         const dx   = targetCx - sourceCx
         const dy   = targetCy - sourceCy
         const dist = Math.hypot(dx, dy)
+
+        // Detenerse 22px antes del centro del objetivo (para no solaparse)
         const reach = dist > 44 ? (dist - 22) / dist : 0.5
         const fx    = dx * reach
         const fy    = dy * reach
-        const rot   = actorSide === 'attacker' ? 14 : -14
+
+        const rot = actorSide === 'attacker' ? 14 : -14
 
         avatarEl.animate(
           [
-            { transform: 'translate(0,0) scale(1) rotate(0deg)',                                                                   offset: 0    },
-            { transform: `translate(${fx*.78}px,${fy*.78}px) scale(${isHeal?1.1:1.22}) rotate(${isHeal?4:rot}deg)`,               offset: 0.30 },
-            { transform: `translate(${fx}px,${fy}px) scale(${isHeal?1.06:0.82}) rotate(${isHeal?0:rot*-.55}deg)`,                 offset: 0.50 },
-            { transform: `translate(${fx*.42}px,${fy*.42}px) scale(1.06) rotate(0deg)`,                                           offset: 0.72 },
-            { transform: 'translate(0,0) scale(1) rotate(0deg)',                                                                   offset: 1    },
+            { transform: 'translate(0,0) scale(1) rotate(0deg)',                                                                  offset: 0    },
+            { transform: `translate(${fx*.78}px,${fy*.78}px) scale(${isHeal?1.1:1.22}) rotate(${isHeal?4:rot}deg)`,              offset: 0.30 },
+            { transform: `translate(${fx}px,${fy}px) scale(${isHeal?1.06:0.82}) rotate(${isHeal?0:rot*-.55}deg)`,                offset: 0.50 },
+            { transform: `translate(${fx*.42}px,${fy*.42}px) scale(1.06) rotate(0deg)`,                                          offset: 0.72 },
+            { transform: 'translate(0,0) scale(1) rotate(0deg)',                                                                  offset: 1    },
           ],
           { duration: animDuration, easing: 'cubic-bezier(0.25,0.46,0.45,0.94)' },
         )
       }
     }
 
-    // Flash + shake on target cards
+    // Flash/shake en objetivos — sincronizados con la llegada del avatar (offset 0.50)
     const impactDelay = Math.round(animDuration * 0.46)
     for (const targetId of targetIds) {
       const cardEl = cardRefs.current.get(targetId)
@@ -599,32 +420,34 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
       if (isHeal) {
         cardEl.animate(
           [
-            { boxShadow: 'none', offset: 0 },
-            { boxShadow: 'inset 0 0 0 2px rgba(52,211,153,0.95),0 0 26px rgba(52,211,153,0.65)', offset: 0.28 },
-            { boxShadow: 'inset 0 0 0 1px rgba(52,211,153,0.3)', offset: 0.65 },
-            { boxShadow: 'none', offset: 1 },
+            { boxShadow: 'none',                                                                      offset: 0    },
+            { boxShadow: 'inset 0 0 0 2px rgba(52,211,153,0.95),0 0 26px rgba(52,211,153,0.65)',     offset: 0.28 },
+            { boxShadow: 'inset 0 0 0 1px rgba(52,211,153,0.3)',                                     offset: 0.65 },
+            { boxShadow: 'none',                                                                      offset: 1    },
           ],
           { duration: 620, delay: impactDelay },
         )
       } else {
+        // Flash rojo
         cardEl.animate(
           [
-            { boxShadow: 'none', offset: 0 },
-            { boxShadow: 'inset 0 0 0 2px rgba(239,68,68,0.95),0 0 26px rgba(239,68,68,0.75)', offset: 0.22 },
-            { boxShadow: 'inset 0 0 0 1px rgba(239,68,68,0.3)', offset: 0.58 },
-            { boxShadow: 'none', offset: 1 },
+            { boxShadow: 'none',                                                                             offset: 0    },
+            { boxShadow: 'inset 0 0 0 2px rgba(239,68,68,0.95),0 0 26px rgba(239,68,68,0.75)',              offset: 0.22 },
+            { boxShadow: 'inset 0 0 0 1px rgba(239,68,68,0.3)',                                              offset: 0.58 },
+            { boxShadow: 'none',                                                                             offset: 1    },
           ],
           { duration: 560, delay: impactDelay },
         )
+        // Shake
         cardEl.animate(
           [
-            { transform: 'translateX(0)',               offset: 0    },
+            { transform: 'translateX(0)',                offset: 0    },
             { transform: 'translateX(-9px) rotate(-2deg)', offset: 0.14 },
             { transform: 'translateX(9px) rotate(2deg)',  offset: 0.28 },
             { transform: 'translateX(-5px)',               offset: 0.44 },
             { transform: 'translateX(5px)',                offset: 0.60 },
             { transform: 'translateX(-2px)',               offset: 0.80 },
-            { transform: 'translateX(0)',               offset: 1    },
+            { transform: 'translateX(0)',                offset: 1    },
           ],
           { duration: 460, delay: impactDelay + 20 },
         )
@@ -632,7 +455,7 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
     }
   }, [animInfo]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Skip to end ───────────────────────────────────────────────────────────
+  // ── Skip ──────────────────────────────────────────────────────────────────
   function handleSkip() {
     if (fetching) return
     const snaps = snapshotsRef.current
@@ -642,11 +465,10 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
     setCurrentLog(snaps.map(s => s.logEntry))
     setActorIndex(last.actorIndex)
     setAnimInfo(null)
-    setFloatNums(new Map())
     setStep(snaps.length)
     if (!completedRef.current) {
       completedRef.current = true
-      setTimeout(() => onComplete(last.winnerId !== null, rewardsRef.current), 1500)
+      setTimeout(() => onComplete(last.winnerId !== null), 1500)
     }
   }
 
@@ -669,20 +491,10 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
   const won = displayState.winnerId !== null
 
   return (
-    <div className="space-y-3">
-      {/* Float number keyframe */}
-      <style>{`
-        @keyframes floatUp {
-          0%   { opacity: 1; transform: translateY(0)    scale(1);    }
-          60%  { opacity: 1; transform: translateY(-36px) scale(1.15); }
-          100% { opacity: 0; transform: translateY(-60px) scale(0.85); }
-        }
-      `}</style>
-
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-2">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <span className="text-white/40 text-xs">Ronda {displayState.round}</span>
-
         <span className={`text-xs px-2 py-0.5 rounded-full border ${
           fetching
             ? 'border-white/20 bg-white/5 text-white/40 animate-pulse'
@@ -692,117 +504,94 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
         }`}>
           {fetching ? '⏳ Cargando...' : isFinished ? '✅ Resuelta' : `⚔️ ${step + 1}/${snapshots.length}`}
         </span>
-
-        {/* Speed + skip controls */}
-        {!fetching && !isFinished && (
-          <div className="flex items-center gap-1">
-            {SPEED_OPTIONS.map((opt, i) => (
-              <button
-                key={opt.label}
-                onClick={() => setSpeedIdx(i)}
-                className={`text-xs px-1.5 py-0.5 rounded border transition-all ${
-                  speedIdx === i
-                    ? 'border-white/40 bg-white/10 text-white/80'
-                    : 'border-white/10 bg-white/3 text-white/30 hover:border-white/20 hover:text-white/50'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-            <button
-              onClick={handleSkip}
-              className="text-xs px-1.5 py-0.5 rounded border border-white/10 bg-white/3 text-white/30 hover:border-white/20 hover:text-white/50 transition-all ml-0.5"
-            >
-              ⏭
-            </button>
-          </div>
-        )}
+        <span className="text-white/30 text-xs">⚔️ PvP</span>
       </div>
 
-      {/* Progress bar */}
+      {/* Progreso */}
       {!fetching && snapshots.length > 0 && (
         <div className="h-0.5 bg-white/5 rounded-full overflow-hidden">
           <div className="h-full bg-white/20 transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
       )}
 
-      {/* ── Phase 1: Arena ── */}
-      <div className="relative rounded-2xl border border-white/8 bg-[#080810] overflow-visible">
-        {/* Atmospheric side glows */}
-        <div className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden">
-          <div className="absolute left-0 top-0 bottom-0 w-1/2 bg-gradient-to-r from-blue-900/15 to-transparent" />
-          <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-red-900/15 to-transparent" />
+      {/* Cola de turnos */}
+      <div className="bg-white/3 border border-white/5 rounded-xl p-3">
+        <p className="text-white/25 text-[10px] text-center mb-2 uppercase tracking-widest">Orden de turno</p>
+        <TurnQueueBar slots={displayState.slots} turnIndex={displayState.turnIndex} actorIndex={actorIndex} />
+      </div>
+
+      {/* Arena — grid 2 columnas */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Tu equipo */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-white/50 text-xs font-medium">Tu equipo</span>
+            {myAura && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/35" title={(myAura as any).auraId}>
+                {getAuraLabel(myAura)}
+              </span>
+            )}
+          </div>
+          {mySlots.map(slot => (
+            <SlotCard
+              key={slot.therianId}
+              slot={slot}
+              isActor={displayState.slots.indexOf(slot) === actorIndex}
+              isNext={displayState.slots.indexOf(slot) === displayState.turnIndex}
+              onCardRef={makeCardRefFn(slot.therianId)}
+              onAvatarRef={makeAvatarRefFn(slot.therianId)}
+            />
+          ))}
         </div>
 
-        {/* Aura name badges */}
-        {(myAura || enemyAura) && (
-          <div className="relative flex justify-between px-3 pt-2 pb-0 gap-2">
-            {myAura
-              ? <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/30">{getAuraLabel(myAura)}</span>
-              : <span />}
-            {enemyAura
-              ? <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/30">{getAuraLabel(enemyAura)}</span>
-              : <span />}
+        {/* Rival */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-white/50 text-xs font-medium">Rival</span>
+            {enemyAura && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/35" title={(enemyAura as any).auraId}>
+                {getAuraLabel(enemyAura)}
+              </span>
+            )}
           </div>
-        )}
-
-        {/* Characters face-to-face */}
-        <div className="relative flex items-start gap-1 px-2 py-3">
-          {/* Attacker column */}
-          <div className="flex flex-col gap-2 flex-1 min-w-0">
-            <p className="text-[9px] text-white/20 uppercase tracking-widest text-center">Tu equipo</p>
-            {mySlots.map(slot => (
-              <ArenaSlot
-                key={slot.therianId}
-                slot={slot}
-                isActor={displayState.slots.indexOf(slot) === actorIndex}
-                isNext={displayState.slots.indexOf(slot) === displayState.turnIndex}
-                onCardRef={makeCardRefFn(slot.therianId)}
-                onAvatarRef={makeAvatarRefFn(slot.therianId)}
-                mirrored={false}
-                floats={floatNums.get(slot.therianId) ?? []}
-              />
-            ))}
-          </div>
-
-          {/* VS center divider */}
-          <div className="flex flex-col items-center justify-center self-stretch pt-7 gap-1 px-0.5 flex-shrink-0">
-            <div className="w-px flex-1 bg-gradient-to-b from-transparent via-white/8 to-transparent" />
-            <span className="text-white/15 text-[9px] font-black tracking-widest">VS</span>
-            <div className="w-px flex-1 bg-gradient-to-b from-transparent via-white/8 to-transparent" />
-          </div>
-
-          {/* Defender column (avatars mirrored) */}
-          <div className="flex flex-col gap-2 flex-1 min-w-0">
-            <p className="text-[9px] text-white/20 uppercase tracking-widest text-center">Rival</p>
-            {enemySlots.map(slot => (
-              <ArenaSlot
-                key={slot.therianId}
-                slot={slot}
-                isActor={displayState.slots.indexOf(slot) === actorIndex}
-                isNext={displayState.slots.indexOf(slot) === displayState.turnIndex}
-                onCardRef={makeCardRefFn(slot.therianId)}
-                onAvatarRef={makeAvatarRefFn(slot.therianId)}
-                mirrored={true}
-                floats={floatNums.get(slot.therianId) ?? []}
-              />
-            ))}
-          </div>
+          {enemySlots.map(slot => (
+            <SlotCard
+              key={slot.therianId}
+              slot={slot}
+              isActor={displayState.slots.indexOf(slot) === actorIndex}
+              isNext={displayState.slots.indexOf(slot) === displayState.turnIndex}
+              onCardRef={makeCardRefFn(slot.therianId)}
+              onAvatarRef={makeAvatarRefFn(slot.therianId)}
+            />
+          ))}
         </div>
       </div>
 
-      {/* ── Turn queue ── */}
-      <div className="bg-white/3 border border-white/5 rounded-xl px-3 py-2">
-        <p className="text-white/20 text-[9px] text-center mb-1.5 uppercase tracking-widest">Orden de turno</p>
-        <TurnQueueBar
-          slots={displayState.slots}
-          turnIndex={displayState.turnIndex}
-          actorIndex={actorIndex}
-        />
-      </div>
-
-      {/* ── Phase 2: Active ability card ── */}
-      {!fetching && <ActiveAbilityCard info={activeAbility} />}
+      {/* Controles de velocidad */}
+      {!fetching && !isFinished && (
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-white/25 text-xs">Vel:</span>
+          {SPEED_OPTIONS.map((opt, i) => (
+            <button
+              key={opt.label}
+              onClick={() => setSpeedIdx(i)}
+              className={`text-xs px-2 py-1 rounded-lg border transition-all ${
+                speedIdx === i
+                  ? 'border-white/40 bg-white/10 text-white/80'
+                  : 'border-white/10 bg-white/3 text-white/30 hover:border-white/20 hover:text-white/50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <button
+            onClick={handleSkip}
+            className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/3 text-white/30 hover:border-white/20 hover:text-white/50 transition-all ml-1"
+          >
+            ⏭ Skip
+          </button>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -811,24 +600,28 @@ export default function BattleField({ battleId, initialState, onComplete }: Prop
         </p>
       )}
 
-      {/* Compact combat log */}
+      {/* Log */}
       {currentLog.length > 0 && (
         <div className="bg-white/3 border border-white/5 rounded-xl p-3 space-y-1.5">
-          <p className="text-white/20 text-[9px] uppercase tracking-widest mb-1.5">Registro</p>
-          {[...currentLog].reverse().slice(0, 4).map((entry, i) => (
+          <p className="text-white/25 text-[10px] uppercase tracking-widest mb-2">Registro</p>
+          {[...currentLog].reverse().slice(0, 5).map((entry, i) => (
             <LogLine key={currentLog.length - 1 - i} entry={entry} isNew={i === 0} />
           ))}
         </div>
       )}
 
-      {/* Result overlay */}
+      {/* ── Pantalla de resultado ── */}
       {isFinished && displayState.status === 'completed' && (
-        <div className={`text-center py-8 rounded-2xl border-2 space-y-3 ${
-          won
-            ? 'border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-amber-500/5 shadow-[0_0_40px_rgba(252,211,77,0.15)]'
-            : 'border-red-500/40  bg-gradient-to-b from-red-500/10  to-red-500/5  shadow-[0_0_40px_rgba(239,68,68,0.12)]'
-        }`}>
-          <div className="text-6xl leading-none">{won ? '🏆' : '💀'}</div>
+        <div
+          className={`result-reveal text-center py-8 rounded-2xl border-2 space-y-3 ${
+            won
+              ? 'border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-amber-500/5 shadow-[0_0_40px_rgba(252,211,77,0.15)]'
+              : 'border-red-500/40  bg-gradient-to-b from-red-500/10  to-red-500/5  shadow-[0_0_40px_rgba(239,68,68,0.12)]'
+          }`}
+        >
+          <div className="icon-pop text-6xl leading-none">
+            {won ? '🏆' : '💀'}
+          </div>
           <div>
             <p className={`text-2xl font-bold ${won ? 'text-amber-300' : 'text-red-300'}`}>
               {won ? '¡Victoria!' : 'Derrota'}
