@@ -128,18 +128,39 @@ Reinicia el contador de acciones del Therian (admin / debug).
 
 ### `POST /api/therian/bite`
 
-El Therian muerde a otro (cooldown 24h).
+Lanza una pelea automática contra otro Therian (cooldown 3 min). Si no se especifica `targetName`, elige un rival aleatorio compatible en rareza (máx. ±2 niveles). Solo se puede morder a Therians con nombre.
 
-**Body:** `{ "targetId": "uuid" }` — ID del Therian objetivo
+**Body:**
+```json
+{ "therianId"?: "uuid", "targetName"?: "NombreRival" }
+```
 
-**Respuesta 200:** `{ "bites": <nuevo_total> }`
+- `therianId`: Therian propio que pelea (por defecto el primero activo).
+- `targetName`: Nombre del rival específico a atacar. Si se omite, elige aleatoriamente.
+
+**Respuesta 200:**
+```json
+{
+  "battle": { "winner": "challenger" | "target", "rounds": [...] },
+  "challenger": TherianDTO,
+  "target": TherianDTO,
+  "biteAwarded": true,
+  "goldEarned": 10,
+  "xpEarned": 10
+}
+```
+
+`target` refleja el estado post-pelea del rival (deaths actualizado). Si el retador gana: gana 10 gold, 10 XP y +1 bite. Si pierde: +1 death.
 
 **Errores:**
-| Código | Status |
-|--------|--------|
-| `COOLDOWN_ACTIVE` | 429 |
-| `SELF_BITE` | 400 |
-| `NOT_FOUND` | 404 |
+| Código | Status | Descripción |
+|--------|--------|-------------|
+| `COOLDOWN_ACTIVE` | 429 | Cooldown activo; incluye `nextBiteAt` |
+| `NO_TARGETS_AVAILABLE` | 404 | No hay rivales compatibles disponibles |
+| `TARGET_NOT_FOUND` | 404 | El `targetName` especificado no existe |
+| `CANNOT_BITE_SELF` | 400 | No se puede pelear contra uno mismo |
+| `RARITY_MISMATCH` | 400 | El rival está fuera del rango de rareza permitido |
+| `NO_THERIAN` | 404 | El usuario no tiene Therian activo |
 
 ---
 
@@ -203,21 +224,48 @@ Equipa habilidades PvP en el Therian (máx. 4).
 
 ### `POST /api/therian/fuse`
 
-Fusiona dos Therians para generar uno de rareza superior.
+Fusiona 3 slots (Therians + huevos) del mismo tier de rareza para generar uno de rareza superior. Los accesorios equipados en los Therians fusionados se devuelven al inventario antes de eliminarlos.
 
-**Body:** `{ "therianAId": "uuid", "therianBId": "uuid", "eggId"?: "egg_rare" }`
+**Body:**
+```json
+{
+  "therianIds": ["uuid1", "uuid2"],
+  "eggUses": [{ "itemId": "egg_rare", "qty": 1 }]
+}
+```
 
-El slot donde faltaría rareza puede cubrirse con un huevo del inventario.
+La suma de `therianIds.length + eggUses[].qty` debe ser exactamente **3**. Todos los slots deben ser del mismo nivel de rareza.
 
-**Respuesta 200:** `TherianDTO` del nuevo Therian fusionado
+**Respuesta 200:**
+```json
+{
+  "success": true,
+  "therian": TherianDTO,
+  "resultRarity": "RARE",
+  "successRate": 0.70
+}
+```
+
+Si la fusión falla (según `successRate`), `success` es `false` y el nuevo Therian mantiene la rareza base.
+
+**Tasas de éxito por rareza base:**
+| Rareza | Probabilidad de subir |
+|--------|-----------------------|
+| COMMON | 100 % |
+| UNCOMMON | 70 % |
+| RARE | 50 % |
+| EPIC | 20 % |
+| LEGENDARY | 5 % |
 
 **Errores:**
-| Código | Status |
-|--------|--------|
-| `NOT_FOUND` | 404 — uno de los Therians no existe |
-| `SAME_THERIAN` | 400 |
-| `RARITY_MISMATCH` | 400 — no compatibles para fusión |
-| `NO_EGG` | 400 — falta huevo del inventario |
+| Código | Status | Descripción |
+|--------|--------|-------------|
+| `INVALID_SELECTION` | 400 | Total de slots ≠ 3 o IDs duplicados |
+| `INVALID_THERIANS` | 400 | Algún Therian no pertenece al usuario |
+| `RARITY_MISMATCH` | 400 | Los slots no son del mismo tier de rareza |
+| `INVALID_EGG` | 400 | ID de huevo no existe en el catálogo |
+| `INSUFFICIENT_EGGS` | 400 | No hay suficientes huevos en el inventario |
+| `MAX_RARITY` | 400 | La rareza base es MYTHIC (máximo) |
 
 ---
 
@@ -261,9 +309,14 @@ Devuelve los Therians en estado `capsule` del usuario.
 
 ### `GET /api/therians/random`
 
-Devuelve un Therian aleatorio para selección de oponente PvP.
+Devuelve un Therian activo y con nombre aleatorio para selección de rival en Bite. Excluye Therians del usuario autenticado.
 
-**Respuesta 200:** `TherianDTO[]` (3 Therians activos de un usuario aleatorio)
+**Query params:**
+- `therianId` (opcional): ID del Therian retador. Cuando se provee, filtra rivales a ±2 tiers de rareza respecto al retador.
+
+**Respuesta 200:** `TherianDTO` (un único Therian)
+
+**Respuesta 404:** `{ "error": "NO_THERIANS" }` — no hay rivales disponibles
 
 ---
 
@@ -322,32 +375,159 @@ Devuelve el estado actual de una batalla.
 
 ### `POST /api/pvp/[id]/action`
 
-Ejecuta la acción del jugador en su turno.
+Ejecuta **todos** los turnos de la batalla en una sola llamada (pre-computado). El servidor resuelve todos los turnos del juego y devuelve el array completo de snapshots para que el cliente los anime como un replay.
 
-**Body:**
+**Body:** `{}` (vacío — la IA toma todas las decisiones)
+
+**Respuesta 200:**
 ```json
-{ "abilityId": "for_regen", "targetId"?: "uuid" }
+{
+  "snapshots": TurnSnapshot[],
+  "state": BattleState,
+  "mmrDelta": 20,
+  "newMmr": 1220,
+  "rank": "Plata",
+  "goldEarned": 75,
+  "weeklyPvpWins": 3
+}
 ```
 
-**Respuesta 200:** `{ "snapshots": TurnSnapshot[], "state": BattleState }`
-
-`snapshots` contiene un snapshot por cada turno resuelto (turno del jugador + todos los turnos de IA siguientes). El cliente los reproduce con delays para animar la batalla.
+`snapshots` contiene un snapshot por turno. El cliente los reproduce con el delay configurado (1× = 1600 ms, 2× = 800 ms, 4× = 350 ms). `mmrDelta` y el resto de campos de recompensa solo aparecen cuando `state.status === 'completed'`.
 
 **Flujo interno:**
-1. Validar que es turno del jugador (`side === 'attacker'`)
-2. Validar habilidad equipada y cooldown
-3. Resolver turno del jugador
-4. Auto-resolver todos los turnos de IA hasta el próximo turno del jugador (o fin de batalla)
-5. Persistir `PvpBattle` actualizado
-6. Devolver array de snapshots + estado final
+1. Resolver todos los turnos (motor puro, sin interactividad)
+2. Persistir estado final en `PvpBattle`
+3. Si batalla completada: calcular MMR delta, gold, actualizar victorias semanales
+4. Devolver array de snapshots + estado final + recompensas
 
 **Errores:**
 | Código | Status |
 |--------|--------|
-| `NOT_YOUR_TURN` | 409 |
-| `ABILITY_NOT_EQUIPPED` | 400 |
-| `ABILITY_ON_COOLDOWN` | 400 |
-| `BATTLE_OVER` | 409 |
+| `BATTLE_OVER` | 409 — la batalla ya estaba completada |
+| `NOT_FOUND` | 404 |
+
+---
+
+### `GET /api/pvp/team`
+
+Devuelve el equipo predeterminado guardado del usuario.
+
+**Respuesta 200:**
+```json
+{
+  "teamIds": ["uuid1", "uuid2", "uuid3"],
+  "therians": [TherianDTO, TherianDTO, TherianDTO]
+}
+```
+
+Si no hay equipo guardado: `{ "teamIds": [], "therians": [] }`
+
+---
+
+### `POST /api/pvp/team`
+
+Guarda el equipo predeterminado del usuario.
+
+**Body:** `{ "teamIds": ["uuid1", "uuid2", "uuid3"] }`
+
+Valida que los 3 Therians pertenecen al usuario y están `active`.
+
+**Respuesta 200:** `{ "ok": true, "teamIds": ["uuid1", "uuid2", "uuid3"] }`
+
+**Errores:**
+| Código | Status |
+|--------|--------|
+| `INVALID_TEAM` | 400 — menos de 3, IDs inválidos o Therians no activos |
+| `INVALID_INPUT` | 400 — formato incorrecto |
+
+---
+
+### `GET /api/pvp/status`
+
+Devuelve el estado completo de PvP del usuario: energía, MMR, rangos y disponibilidad de recompensas.
+
+**Respuesta 200:**
+```json
+{
+  "mmr": 1200,
+  "rank": "Plata",
+  "peakMmr": 1350,
+  "peakRank": "Oro",
+  "weeklyPvpWins": 7,
+  "weeklyRequired": 15,
+  "chestAvailable": false,
+  "alreadyClaimedChest": false,
+  "energy": 8,
+  "energyMax": 10,
+  "energyRegenAt": "2026-03-01T12:00:00.000Z",
+  "currentMonth": "2026-03",
+  "monthlyReward": { "gold": 1500 },
+  "alreadyClaimedMonthly": false
+}
+```
+
+La energía se regenera automáticamente al consultar este endpoint si corresponde (dirty write). `energyRegenAt` indica cuándo se regenerará la siguiente unidad.
+
+---
+
+### `GET /api/pvp/ranking`
+
+Devuelve el ranking global top 10 por MMR.
+
+**Respuesta 200:**
+```json
+{
+  "entries": [
+    { "position": 1, "name": "Usuario", "mmr": 2500, "rank": "Maestro", "isCurrentUser": false }
+  ],
+  "currentUser": { "position": 15, "mmr": 1200, "rank": "Plata", "isCurrentUser": true }
+}
+```
+
+`currentUser` es `null` si el usuario autenticado está en el top 10 (ya aparece en `entries`).
+
+---
+
+### `GET /api/pvp/rewards/weekly`
+
+Estado del cofre semanal.
+
+**Respuesta 200:**
+```json
+{
+  "weeklyPvpWins": 7,
+  "required": 15,
+  "chestAvailable": false,
+  "alreadyClaimed": false,
+  "weekResetAt": "2026-03-07T00:00:00.000Z",
+  "preview": { "gold": 800, "egg": "egg_rare", "runes": 2 }
+}
+```
+
+### `POST /api/pvp/rewards/weekly`
+
+Reclama el cofre semanal (requiere ≥ 15 victorias en el período).
+
+**Respuesta 200:**
+```json
+{ "gold": 800, "egg": "egg_rare", "runes": ["v_1", "a_2"] }
+```
+
+**Errores:**
+| Código | Status |
+|--------|--------|
+| `NOT_ENOUGH_WINS` | 400 |
+| `ALREADY_CLAIMED` | 409 |
+
+---
+
+### `GET /api/pvp/rewards/monthly`
+
+Estado de la recompensa mensual (basada en rango pico del mes).
+
+### `POST /api/pvp/rewards/monthly`
+
+Reclama la recompensa mensual.
 
 ---
 
@@ -374,19 +554,40 @@ Compra un artículo de la tienda.
 
 **Body:**
 ```json
-{ "itemId": "acc_crown", "therianId"?: "uuid" }
+{
+  "itemId": "acc_crown",
+  "quantity"?: 1,
+  "newName"?: "NuevoNombre",
+  "therianId"?: "uuid"
+}
 ```
 
-`therianId` requerido para artículos de tipo `cosmetic` que se equipan directamente.
+- `therianId`: Para artículos de tipo `rename`, selecciona a qué Therian aplicar el cambio de nombre (por defecto el primero). Para cosméticos, actualmente no se usa en el servidor.
+- `newName`: Requerido cuando `itemId === "rename"`.
+- `quantity`: Solo para huevos (1–99).
 
-**Respuesta 200:** `{ "success": true, "wallet": { "gold": N, "essence": N } }`
+**Respuesta 200:**
+```json
+{
+  "success": true,
+  "newBalance": { "gold": N, "essence": N, "therianSlots": N },
+  "updatedTherian"?: TherianDTO,
+  "achievementUnlocked"?: { "id": "en_aventura", "title": "En Aventura", "rewardLabel": "🪙 +500 Oro" }
+}
+```
+
+`updatedTherian` está presente solo cuando el artículo es `rename`. `achievementUnlocked` aparece la primera vez que se compra un slot extra.
 
 **Errores:**
-| Código | Status |
-|--------|--------|
-| `ITEM_NOT_FOUND` | 404 |
-| `INSUFFICIENT_FUNDS` | 402 |
-| `ALREADY_OWNED` | 409 |
+| Código | Status | Descripción |
+|--------|--------|-------------|
+| `ITEM_NOT_FOUND` | 404 | ID no existe en el catálogo |
+| `INSUFFICIENT_ESSENCIA` | 400 | Saldo de gold insuficiente |
+| `INSUFFICIENT_COIN` | 400 | Saldo de essence insuficiente |
+| `NAME_REQUIRED` | 400 | Falta `newName` al renombrar |
+| `NAME_TAKEN` | 409 | El nombre ya está en uso |
+| `NO_THERIAN` | 404 | No existe Therian para aplicar el rename |
+| `MAX_SLOTS_REACHED` | 400 | El usuario ya tiene 8 slots |
 
 ---
 
@@ -432,7 +633,10 @@ Intercambia gold por essence (o viceversa) a una tasa fija.
 
 ### `GET /api/leaderboard`
 
-Devuelve el ranking global de Therians.
+Devuelve el ranking de combate global (ordenado por `bites` desc). La página `/leaderboard` agrega un segundo tab de ranking por nivel de cuenta, que se calcula server-side.
+
+**Query params:**
+- `limit` (opcional, default 20, máx 50): Número de entradas a devolver.
 
 **Respuesta 200:**
 ```json
@@ -440,12 +644,25 @@ Devuelve el ranking global de Therians.
   "entries": [
     {
       "rank": 1,
-      "therian": TherianDTO,
-      "score": 9800
+      "id": "uuid",
+      "name": "NombreTherian",
+      "species": { "id": "fox", "name": "Zorro", "emoji": "🦊" },
+      "rarity": "EPIC",
+      "bites": 42,
+      "appearance": {
+        "palette": "ember",
+        "paletteColors": { "primary": "#C0392B", "secondary": "#E67E22", "accent": "#F39C12" },
+        "eyes": "sharp",
+        "pattern": "solid",
+        "signature": "tail_fluffy"
+      }
     }
-  ]
+  ],
+  "userRank": 7
 }
 ```
+
+`userRank` es el puesto del Therian del usuario autenticado (basado en `bites`). `null` si no hay sesión o el usuario no tiene Therian con nombre.
 
 ---
 
