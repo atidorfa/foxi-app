@@ -12,6 +12,7 @@ import CurrencyDisplay from '@/components/CurrencyDisplay'
 import NavShopButton from '@/components/NavShopButton'
 import NavFusionButton from '@/components/NavFusionButton'
 import NavInventoryButton from '@/components/NavInventoryButton'
+import NavPvpButton from '@/components/NavPvpButton'
 import PassiveIncomeCard from '@/components/PassiveIncomeCard'
 import TutorialCard from '@/components/TutorialCard'
 import { ACHIEVEMENTS } from '@/lib/catalogs/achievements'
@@ -95,7 +96,7 @@ export default async function TherianPage() {
           <NavInventoryButton />
           <CurrencyDisplay />
           <NavShopButton therian={primaryTherian} />
-          <Link href="/pvp" className="text-[#8B84B0] hover:text-white text-sm transition-colors">⚔️ PvP</Link>
+          <NavPvpButton />
           <Link href="/leaderboard" className="text-[#8B84B0] hover:text-white text-sm transition-colors">🏆 Top</Link>
           <SignOutButton/>
         </div>
