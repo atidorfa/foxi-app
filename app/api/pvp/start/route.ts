@@ -9,6 +9,7 @@ import { computeEnergy, spendEnergy } from '@/lib/pvp/energy'
 
 const schema = z.object({
   attackerTeamIds: z.array(z.string()).length(3),
+  mode: z.enum(['auto', 'manual']).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest) {
       charisma:          stats.charisma,
       auraId:            (t as any).auraId ?? null,
       equippedAbilities: JSON.parse(t.equippedAbilities || '[]') as string[],
+      equippedPassives:  JSON.parse((t as any).equippedPassives || '[]') as string[],
       avatarSnapshot: {
         appearance: {
           palette:      appearance.palette,
@@ -147,6 +149,8 @@ export async function POST(req: NextRequest) {
   let state
   try {
     state = initBattleState(attackerMembers, defenderMembers)
+    // Set battle mode (auto is default, already set in engine)
+    if (body.mode) state.mode = body.mode
   } catch (err) {
     console.error('[pvp/start] Engine error:', err)
     return NextResponse.json({ error: 'ENGINE_ERROR', detail: String(err) }, { status: 500 })

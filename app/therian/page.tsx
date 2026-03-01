@@ -89,7 +89,7 @@ export default async function TherianPage() {
       </div>
 
       {/* Navbar */}
-      <nav className="relative z-10 border-b border-white/5 bg-[#08080F]/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between">
+      <nav className="relative z-40 border-b border-white/5 bg-[#08080F]/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between">
         <span className="text-xl font-bold gradient-text">therian.biz</span>
         <div className="flex items-center gap-4">
           <NavFusionButton />
@@ -97,6 +97,7 @@ export default async function TherianPage() {
           <CurrencyDisplay />
           <NavShopButton therian={primaryTherian} />
           <NavPvpButton />
+          <Link href="/spellbook" className="text-[#8B84B0] hover:text-white text-sm transition-colors">📖 Hechizos</Link>
           <Link href="/leaderboard" className="text-[#8B84B0] hover:text-white text-sm transition-colors">🏆 Top</Link>
           <SignOutButton/>
         </div>

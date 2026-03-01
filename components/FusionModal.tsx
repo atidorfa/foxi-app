@@ -68,7 +68,7 @@ export default function FusionModal({ therians, inventory, onClose, onSuccess }:
   const [localInventory, setLocalInventory] = useState<InventoryItemDTO[]>(inventory)
   const [slots, setSlots] = useState<FusionSlot[]>([null, null, null])
   const [phase, setPhase] = useState<Phase>('select')
-  const [result, setResult] = useState<{ success: boolean; therian: TherianDTO; successRate: number } | null>(null)
+  const [result, setResult] = useState<{ success: boolean; therian: TherianDTO; successRate: number; encapsulated: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showProbs, setShowProbs] = useState(false)
   const [hasFused, setHasFused] = useState(false)
@@ -209,7 +209,7 @@ export default function FusionModal({ therians, inventory, onClose, onSuccess }:
         setPhase('select')
         return
       }
-      setResult({ success: data.success, therian: data.therian, successRate: data.successRate * 100 })
+      setResult({ success: data.success, therian: data.therian, successRate: data.successRate * 100, encapsulated: !!data.encapsulated })
       setHasFused(true)
       setPhase('result')
       // Refresh both therians and inventory
@@ -486,6 +486,15 @@ export default function FusionModal({ therians, inventory, onClose, onSuccess }:
                 <p className="text-red-400 font-bold text-base tracking-widest uppercase">✗ Fusión fallida</p>
                 <p className="text-red-300/60 text-xs mt-0.5">
                   Probabilidad era {result.successRate}% — Therian de la misma rareza obtenido
+                </p>
+              </div>
+            )}
+
+            {result.encapsulated && (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2.5 text-xs">
+                <span className="text-amber-400 flex-shrink-0">💊</span>
+                <p className="text-amber-300/80 leading-relaxed">
+                  Sin slots activos disponibles — el Therian fue enviado a la <span className="font-semibold text-amber-300">cápsula</span>. Libera un slot o compra uno nuevo para activarlo.
                 </p>
               </div>
             )}

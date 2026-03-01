@@ -4,9 +4,26 @@ import { getTraitById } from './catalogs/traits'
 import { getPaletteById } from './catalogs/appearance'
 import { getRuneById, type Rune } from './catalogs/runes'
 import { getAuraById, TIER_LABEL } from './catalogs/auras'
-import type { TherianStats, TherianAppearance, Rarity } from './generation/engine'
+import type { TherianStats, TherianAppearance, Rarity, Archetype } from './generation/engine'
 import { SHOP_ITEMS } from './shop/catalog'
 import { MAX_ACTIONS } from './actions/narratives'
+
+const LEGACY_ARCHETYPE_MAP: Record<string, Archetype> = {
+  silent:      'forestal',
+  mystic:      'forestal',
+  guardian:    'acuatico',
+  curious:     'acuatico',
+  impulsive:   'electrico',
+  feral:       'electrico',
+  charismatic: 'volcanico',
+  loyal:       'volcanico',
+}
+const VALID_ARCHETYPES: Archetype[] = ['forestal', 'electrico', 'acuatico', 'volcanico']
+
+function resolveArchetype(traitId: string): Archetype {
+  if ((VALID_ARCHETYPES as string[]).includes(traitId)) return traitId as Archetype
+  return LEGACY_ARCHETYPE_MAP[traitId] ?? 'forestal'
+}
 
 function parseEquippedAccessories(raw: string | null): Record<string, string> {
   try {
@@ -88,6 +105,7 @@ export function toTherianDTO(therian: Therian) {
     trait: trait
       ? { id: trait.id, name: trait.name, lore: trait.lore }
       : { id: therian.traitId, name: therian.traitId, lore: '' },
+    archetype: resolveArchetype(therian.traitId),
     appearance: {
       palette: appearance.palette,
       paletteColors: palette
@@ -111,6 +129,7 @@ export function toTherianDTO(therian: Therian) {
     nextBiteAt,
     equippedAccessories: parseEquippedAccessories(therian.accessories ?? null),
     equippedAbilities: JSON.parse(therian.equippedAbilities || '[]') as string[],
+    equippedPassives:  JSON.parse((therian as any).equippedPassives || '[]') as string[],
     aura: (() => {
       const auraId = (therian as any).auraId as string | null | undefined
       if (!auraId) return null

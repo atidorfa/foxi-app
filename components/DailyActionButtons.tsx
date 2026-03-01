@@ -170,7 +170,8 @@ export default function DailyActionButtons({ therian, onSpinStart, onAction, onE
             const bgClass     = isHighlighted ? slot.bg     : spinning ? slot.bgSpin     : slot.bgIdle
             const textClass   = isHighlighted ? slot.text   : spinning ? slot.textSpin   : slot.textIdle
             const barClass    = isHighlighted ? slot.bar    : spinning ? slot.barSpin    : slot.barIdle
-            const dur = isHighlighted ? '60ms' : '150ms'
+            // During fast spin keep non-highlighted slots snappy so transitions complete within each frame
+            const dur = isHighlighted ? '55ms' : spinning ? '45ms' : '150ms'
             const gained = therian.actionGains[slot.type] ?? 0
             const barPct = Math.round((gained / maxGain) * 100)
 
@@ -178,12 +179,13 @@ export default function DailyActionButtons({ therian, onSpinStart, onAction, onE
               <div
                 key={slot.type}
                 className={[
-                  'relative flex flex-col items-center gap-1 p-3 rounded-xl border transition-all',
+                  'relative flex flex-col items-center gap-1 p-3 rounded-xl border',
+                  'transition-[border-color,background-color,opacity,transform,box-shadow]',
                   borderClass, bgClass,
                   isHighlighted ? `scale-105 ${slot.shadow}` : '',
                   hasWinner && !isWinner ? 'opacity-25' : '',
                 ].join(' ')}
-                style={{ transitionDuration: dur }}
+                style={{ transitionDuration: dur, willChange: spinning ? 'transform, opacity' : 'auto' }}
               >
                 <span className={`text-xl transition-transform ${isHighlighted ? 'scale-110' : ''}`}
                   style={{ transitionDuration: dur }}>

@@ -7,7 +7,7 @@ export type Archetype = 'forestal' | 'electrico' | 'acuatico' | 'volcanico'
 export type AbilityType = 'active' | 'passive'
 export type TargetType = 'single' | 'all' | 'self' | 'ally'
 export type AuraType = 'hp' | 'damage' | 'defense' | 'agility'
-export type EffectType = 'buff' | 'debuff' | 'stun'
+export type EffectType = 'buff' | 'debuff' | 'stun' | 'dot' | 'shield_buff'
 
 // ─── Tabla de ventajas elementales ───────────────────────────────────────────
 // volcanico > forestal, forestal > acuatico, acuatico > volcanico
@@ -27,14 +27,27 @@ export function getTypeMultiplier(attacker: Archetype, defender: Archetype): num
 // ─── Habilidades ──────────────────────────────────────────────────────────────
 
 export interface AbilityEffect {
-  damage?:  number                                     // multiplicador de daño base (1.0 = normal)
-  heal?:    number                                     // multiplicador de curación base (1.0 = normal)
-  stun?:    number                                     // turnos de stun
-  reflect?: number                                     // % daño reflejado (pasivo)
-  damageReduction?: number                             // % reducción de daño entrante (pasivo)
-  tiebreaker?: boolean                                 // actúa primero en empate de agility (pasivo)
-  buff?:  { stat: 'agility' | 'damage'; pct: number; turns: number }
-  debuff?: { stat: 'agility' | 'damage'; pct: number; turns: number }
+  // ── Activos ───────────────────────────────────────────────────────────────
+  damage?:   number                                    // multiplicador de daño base (1.0 = normal)
+  heal?:     number                                    // multiplicador de curación base (1.0 = normal)
+  stun?:     number                                    // turnos de stun
+  buff?:     { stat: 'agility' | 'damage'; pct: number; turns: number }
+  debuff?:   { stat: 'agility' | 'damage'; pct: number; turns: number }
+  dot?:      { damage: number; turns: number }         // daño por turno (multiplier × base dmg)
+  lifeSteal?: number                                   // fracción del daño curada al actor (0–1)
+  shield?:   number                                    // HP de escudo absorbido antes de currentHp
+  multiHit?: { count: number; dmg: number }            // N golpes a dmg multiplicador c/u
+  execute?:  { threshold: number; bonus: number }      // ×bonus si rival HP < threshold (0–1)
+  stunChance?: number                                  // probabilidad de stun (0–1)
+  // ── Pasivos ───────────────────────────────────────────────────────────────
+  reflect?:        number          // % daño reflejado
+  thorns?:         number          // igual que reflect (alias semántico)
+  damageReduction?: number         // % reducción de daño entrante
+  tiebreaker?:     boolean         // actúa primero en empate de agility
+  regen?:          number          // HP curado al inicio de cada turno
+  critBoost?:      number          // +% probabilidad de crítico
+  immunity?:       'stun' | 'debuff' // inmune a efecto
+  endure?:         boolean         // sobrevive 1 golpe fatal con 1HP (1x batalla)
 }
 
 export interface Ability {
@@ -51,9 +64,9 @@ export interface Ability {
 // ─── Estado de combate ────────────────────────────────────────────────────────
 
 export interface ActiveEffect {
-  type:          EffectType
-  stat?:         'agility' | 'damage'
-  value:         number           // pct como decimal (ej. 0.25) o turnos (stun)
+  type:           EffectType
+  stat?:          'agility' | 'damage'
+  value:          number           // pct como decimal (ej. 0.25) o turnos (stun) o daño (dot)
   turnsRemaining: number
 }
 
@@ -81,12 +94,14 @@ export interface TurnSlot {
   vitality:          number       // para fórmulas de curación
   instinct:          number       // para fórmulas de bloqueo
   charisma:          number       // para fórmulas de aura
-  equippedAbilities: string[]     // IDs de habilidades equipadas (max 4)
+  equippedAbilities: string[]     // IDs de habilidades ACTIVAS equipadas (max 3)
+  equippedPassives:  string[]     // IDs de habilidades PASIVAS equipadas (max 2)
   innateAbilityId:   string       // básico innato según arquetipo
   cooldowns:         Record<string, number>  // abilityId → turnos restantes
   effects:           ActiveEffect[]
   isDead:            boolean
   shieldHp:          number       // escudo de daño absorbido antes de currentHp
+  endureUsed:        boolean      // pasiva Resiliencia ya activada esta batalla
   isLeader:          boolean      // el de mayor CHA del equipo (para Avatar de la Cascada)
   avatarSnapshot?:   AvatarSnapshot
 }
@@ -150,6 +165,11 @@ export interface BattleState {
   log:        ActionLogEntry[]
   status:     'active' | 'completed'
   winnerId:   string | null  // userId del ganador, o null si ganó el defensor
+  // ── 1v1 system ──────────────────────────────────────────────────────────────
+  frontliner?: { attacker: string; defender: string }  // therianId activo por lado
+  mode?:        'auto' | 'manual'                      // auto = IA todo, manual = jugador elige
+  phase?:       'active' | 'waiting_attacker_switch' | 'waiting_defender_switch'
+  switchCooldownEnd?: number | null                    // Unix ms, cooldown del jugador para cambiar
 }
 
 // ─── Snapshot por turno (para animación cliente) ──────────────────────────────
@@ -174,6 +194,10 @@ export interface TurnSnapshot {
   logEntry:   ActionLogEntry
   status:     'active' | 'completed'
   winnerId:   string | null
+  // ── 1v1 additions ──────────────────────────────────────────────────────────
+  switchEvent?:  { side: 'attacker' | 'defender'; outId: string; inId: string }
+  frontliner?:   { attacker: string; defender: string }
+  phase?:        'active' | 'waiting_attacker_switch' | 'waiting_defender_switch'
 }
 
 // ─── IA ───────────────────────────────────────────────────────────────────────

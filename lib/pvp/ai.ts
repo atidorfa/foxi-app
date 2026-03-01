@@ -1,4 +1,4 @@
-import type { TurnSlot, AIAction, Archetype } from './types'
+import type { TurnSlot, AIAction, Archetype, BattleState } from './types'
 import { getTypeMultiplier } from './types'
 import { ABILITY_BY_ID, ABILITIES } from './abilities'
 
@@ -38,6 +38,43 @@ export function aiDecide(
   // 3. Usar la mejor habilidad ofensiva disponible (no en cooldown, no pasiva)
   const best = bestOffensiveAbility(actor)
   return { abilityId: best, targetId: best === actor.innateAbilityId ? priorityTarget.therianId : priorityTarget.therianId }
+}
+
+/**
+ * Decide si la IA debe cambiar el frontliner activo de `side` por desventaja de tipo.
+ * Solo cambia si hay un miembro de banco con ventaja elemental sobre el rival.
+ * Devuelve el therianId a cambiar, o null si no se debe cambiar.
+ */
+export function aiDecideSwitch(
+  state: BattleState,
+  side: 'attacker' | 'defender',
+): string | null {
+  if (!state.frontliner) return null
+
+  const myFrontierId    = state.frontliner[side]
+  const enemySide       = side === 'attacker' ? 'defender' : 'attacker'
+  const enemyFrontierId = state.frontliner[enemySide]
+
+  const myFrontliner    = state.slots.find(s => s.therianId === myFrontierId && !s.isDead)
+  const enemyFrontliner = state.slots.find(s => s.therianId === enemyFrontierId && !s.isDead)
+
+  if (!myFrontliner || !enemyFrontliner) return null
+
+  // Switch when bench has type advantage AND current frontliner doesn't already have advantage
+  const myMult = getTypeMultiplier(myFrontliner.archetype, enemyFrontliner.archetype)
+  if (myMult > 1.0) return null  // already winning the type matchup, stay
+
+  // Look for a bench slot with type advantage over the enemy
+  const bench = state.slots.filter(
+    s => s.side === side && !s.isDead && s.therianId !== myFrontierId
+  )
+  if (bench.length === 0) return null
+
+  const better = bench.find(
+    b => getTypeMultiplier(b.archetype, enemyFrontliner.archetype) > 1.0
+  )
+  // Return the advantageous slot, or null if no better option available
+  return better?.therianId ?? null
 }
 
 function findCureAbility(actor: TurnSlot) {

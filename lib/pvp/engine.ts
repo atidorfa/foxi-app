@@ -19,7 +19,8 @@ export interface InitTeamMember {
   instinct:   number
   charisma:   number
   auraId?:    string | null        // aura asignada en generación
-  equippedAbilities: string[]      // IDs equipadas (max 4)
+  equippedAbilities: string[]      // IDs activas equipadas (max 3)
+  equippedPassives:  string[]      // IDs pasivas equipadas (max 2)
   avatarSnapshot?: AvatarSnapshot
 }
 
@@ -100,6 +101,14 @@ export function initBattleState(
     return 0
   })
 
+  // ── 1v1: pick highest-agility frontliner per side (first in sorted list) ──
+  const initAttacker = allSlots.find(s => s.side === 'attacker')
+  const initDefender = allSlots.find(s => s.side === 'defender')
+  const frontliner = (initAttacker && initDefender) ? {
+    attacker: initAttacker.therianId,
+    defender: initDefender.therianId,
+  } : undefined
+
   return {
     slots:     allSlots,
     turnIndex: 0,
@@ -109,6 +118,9 @@ export function initBattleState(
     log:       [],
     status:    'active',
     winnerId:  null,
+    frontliner,
+    mode:      'auto',
+    phase:     'active',
   }
 }
 
@@ -128,11 +140,13 @@ function buildSlot(m: InitTeamMember, side: 'attacker' | 'defender', isLeader: b
     instinct:          m.instinct,
     charisma:          m.charisma,
     equippedAbilities: m.equippedAbilities,
+    equippedPassives:  m.equippedPassives ?? [],
     innateAbilityId:   innate?.id ?? `basic_${m.archetype}`,
     cooldowns:         {},
     effects:           [],
     isDead:            false,
     shieldHp:          0,
+    endureUsed:        false,
     isLeader,
     avatarSnapshot:    m.avatarSnapshot,
   }
@@ -274,6 +288,29 @@ export function applyRoundStartHooks(state: BattleState, round: number) {
       }
     }
   }
+
+  // Regen from passive abilities
+  for (const slot of state.slots.filter(s => !s.isDead)) {
+    for (const id of (slot.equippedPassives ?? [])) {
+      const ab = ABILITY_BY_ID[id]
+      if (ab?.effect.regen) {
+        slot.currentHp = Math.min(slot.maxHp, slot.currentHp + ab.effect.regen)
+      }
+    }
+  }
+
+  // DoT tick — apply damage from 'dot' effects
+  for (const slot of state.slots.filter(s => !s.isDead)) {
+    const dotEffects = slot.effects.filter(e => e.type === 'dot')
+    for (const dot of dotEffects) {
+      const baseDmg = FORMULAS.damage(slot.effectiveAgility)
+      const dotDmg = Math.max(1, Math.round(baseDmg * dot.value))
+      slot.currentHp = Math.max(0, slot.currentHp - dotDmg)
+      if (slot.currentHp <= 0) {
+        slot.isDead = true
+      }
+    }
+  }
 }
 
 // ─── Hooks por acción del actor ───────────────────────────────────────────────
@@ -359,6 +396,12 @@ function checkSurvival(
 ): { survive: boolean; overrideDmg: number } {
   if (slot.currentHp > incomingDamage) {
     return { survive: true, overrideDmg: incomingDamage }
+  }
+
+  // Endure passive: survive fatal blow with 1 HP (once per battle)
+  if (!slot.endureUsed && slot.equippedPassives?.some(id => ABILITY_BY_ID[id]?.effect.endure)) {
+    slot.endureUsed = true
+    return { survive: true, overrideDmg: slot.currentHp - 1 }
   }
 
   const aura = state.auras.find(a => a.side === slot.side)
@@ -472,32 +515,33 @@ function modifyIncomingDamage(
   let d = dmg
   const aura = state.auras.find(a => a.side === target.side)
   const auraState = state.auraState[target.side]
-  if (!aura) return d
 
-  const fx = aura.effect
-  const leaderSlot = state.slots.find(s => s.side === target.side && s.isLeader)
-  const leaderCha = leaderSlot?.charisma ?? target.charisma
+  if (aura) {
+    const fx = aura.effect
+    const leaderSlot = state.slots.find(s => s.side === target.side && s.isLeader)
+    const leaderCha = leaderSlot?.charisma ?? target.charisma
 
-  // Raíces de Hierro: reduce entrante por CHA*0.003, cap 15%
-  if (fx.incomingReduction === 'cha_3x1000_cap15') {
-    const pct = Math.min(leaderCha * 0.003, 0.15)
-    d = Math.round(d * (1 - pct))
-  }
+    // Raíces de Hierro: reduce entrante por CHA*0.003, cap 15%
+    if (fx.incomingReduction === 'cha_3x1000_cap15') {
+      const pct = Math.min(leaderCha * 0.003, 0.15)
+      d = Math.round(d * (1 - pct))
+    }
 
-  // Capa de Musgo: básicos -5%
-  if (fx.basicDmgReduction && isBasic) {
-    d = Math.round(d * (1 - fx.basicDmgReduction))
-  }
+    // Capa de Musgo: básicos -5%
+    if (fx.basicDmgReduction && isBasic) {
+      d = Math.round(d * (1 - fx.basicDmgReduction))
+    }
 
-  // Abismo de Calma: AoE -25%
-  if (fx.aoeReduction && isAoe) {
-    d = Math.round(d * (1 - fx.aoeReduction))
-  }
+    // Abismo de Calma: AoE -25%
+    if (fx.aoeReduction && isAoe) {
+      d = Math.round(d * (1 - fx.aoeReduction))
+    }
 
-  // Tormenta de Iones del rival: si el target es el marcado, -10% defensa del slot
-  const enemyAuraState = state.auraState[actor.side as 'attacker' | 'defender']
-  if (enemyAuraState.tormentaTargetId === target.therianId) {
-    d = Math.round(d * 1.10) // +10% daño recibido (menos defensa)
+    // Tormenta de Iones del rival: si el target es el marcado, -10% defensa del slot
+    const enemyAuraState = state.auraState[actor.side as 'attacker' | 'defender']
+    if (enemyAuraState.tormentaTargetId === target.therianId) {
+      d = Math.round(d * 1.10) // +10% daño recibido (menos defensa)
+    }
   }
 
   // Escudo de daño (absorbe antes de currentHp) — ignorado por Lava Fundente
@@ -508,6 +552,14 @@ function modifyIncomingDamage(
     } else {
       d -= target.shieldHp
       target.shieldHp = 0
+    }
+  }
+
+  // damageReduction from passive abilities (e.g. acu_fluid)
+  for (const id of (target.equippedPassives ?? [])) {
+    const ab = ABILITY_BY_ID[id]
+    if (ab?.effect.damageReduction) {
+      d = Math.round(d * (1 - ab.effect.damageReduction))
     }
   }
 
@@ -719,7 +771,35 @@ export function resolveTurn(state: BattleState, input: TurnInput, rng: () => num
     state.winnerId = 'attacker'
   }
 
-  if (state.status === 'active') advanceTurn(state)
+  if (state.status === 'active') {
+    if (state.frontliner) {
+      // In 1v1 mode: check if any frontliner just died
+      let frontlinerDiedSide: 'attacker' | 'defender' | null = null
+      for (const side of ['attacker', 'defender'] as const) {
+        const frontierId = state.frontliner[side]
+        const frontlinerSlot = state.slots.find(s => s.therianId === frontierId)
+        if (frontlinerSlot?.isDead) {
+          // Only pause if there are alive bench slots; otherwise victory already set above
+          const aliveOnSide = state.slots.filter(s => s.side === side && !s.isDead)
+          if (aliveOnSide.length > 0) {
+            frontlinerDiedSide = side
+          }
+          break
+        }
+      }
+      if (frontlinerDiedSide) {
+        state.phase = frontlinerDiedSide === 'attacker'
+          ? 'waiting_attacker_switch'
+          : 'waiting_defender_switch'
+        // Don't advance — action route handles the switch before resuming
+      } else {
+        state.phase = 'active'
+        advanceTurn(state)
+      }
+    } else {
+      advanceTurn(state)
+    }
+  }
 
   return { state, entry }
 }
@@ -773,7 +853,12 @@ function resolveAction(
 
     // Crit
     const critChance = Math.min(0.40, target.instinct / 200) // usa instinct del atacante? No, crit chance es del actor
-    const actorCritChance = Math.min(0.40, actor.instinct / 200)
+    let actorCritChance = Math.min(0.40, actor.instinct / 200)
+    // critBoost from passive abilities
+    for (const id of (actor.equippedPassives ?? [])) {
+      const ab = ABILITY_BY_ID[id]
+      if (ab?.effect.critBoost) actorCritChance += ab.effect.critBoost
+    }
     const isCrit = !blocked && rng() < actorCritChance
     let finalDamage: number
 
@@ -784,45 +869,102 @@ function resolveAction(
       finalDamage = blocked ? FORMULAS.blockDamage(modifiedDmg) : modifiedDmg
     }
 
-    // Lava Fundente: bypass shields
-    const lavaActive = atkAura?.effect.lavaFundente ?? false
-
-    // Aplicar reducción defensiva + shields
-    const netDmg = modifyIncomingDamage(state, actor, target, finalDamage, isBasic, isAoe, lavaActive)
-
-    // Espinas del Pantano: thorns por hit
-    if (defAura?.effect.espinas === 'cha_8pct') {
-      const leaderSlot = state.slots.find(s => s.side === target.side && s.isLeader)
-      const thornsDmg = Math.max(1, Math.round((leaderSlot?.charisma ?? target.charisma) * 0.08))
-      result.reflected = thornsDmg
+    // Execute: multiply damage if target HP is below threshold
+    if (ability.effect.execute) {
+      const hpPct = target.currentHp / target.maxHp
+      if (hpPct < ability.effect.execute.threshold) {
+        finalDamage = Math.round(finalDamage * ability.effect.execute.bonus)
+        result.effect = 'Ejecución'
+      }
     }
 
-    // Reflect pasivo de habilidades (no de aura espinas)
-    const reflectPct = getReflectPct(target)
-    if (reflectPct > 0) {
-      result.reflected = (result.reflected ?? 0) + Math.round(finalDamage * reflectPct)
+    // MultiHit: overrides normal single-hit path
+    if (ability.effect.multiHit) {
+      const { count, dmg } = ability.effect.multiHit
+      const typeMultiplier = getTypeMultiplier(actor.archetype, target.archetype)
+      const archetypeBonus = FORMULAS.archetypeBonus(actor.archetype, ability.archetype)
+      let totalDmg = 0
+      for (let i = 0; i < count; i++) {
+        const baseHit = FORMULAS.damage(actor.effectiveAgility)
+        const hit = Math.max(1, Math.round(baseHit * dmg * typeMultiplier * archetypeBonus))
+        totalDmg += hit
+      }
+      const lavaActiveMulti = atkAura?.effect.lavaFundente ?? false
+      const netMultiDmg = modifyIncomingDamage(state, actor, target, totalDmg, false, false, lavaActiveMulti)
+      const { survive: surviveMulti, overrideDmg: overrideMulti } = checkSurvival(state, target, netMultiDmg)
+      target.currentHp = Math.max(0, target.currentHp - overrideMulti)
+      result.damage = overrideMulti
+      if (!surviveMulti && target.currentHp <= 0) { target.isDead = true; result.died = true; applyOnDeathHooks(state, target) }
+      result.effect = (result.effect ? result.effect + ', ' : '') + `${count} golpes`
+    } else {
+      // Lava Fundente: bypass shields
+      const lavaActive = atkAura?.effect.lavaFundente ?? false
+
+      // Aplicar reducción defensiva + shields
+      const netDmg = modifyIncomingDamage(state, actor, target, finalDamage, isBasic, isAoe, lavaActive)
+
+      // Espinas del Pantano: thorns por hit
+      if (defAura?.effect.espinas === 'cha_8pct') {
+        const leaderSlot = state.slots.find(s => s.side === target.side && s.isLeader)
+        const thornsDmg = Math.max(1, Math.round((leaderSlot?.charisma ?? target.charisma) * 0.08))
+        result.reflected = thornsDmg
+      }
+
+      // Reflect pasivo de habilidades (no de aura espinas)
+      const reflectPct = getReflectPct(target)
+      if (reflectPct > 0) {
+        result.reflected = (result.reflected ?? 0) + Math.round(finalDamage * reflectPct)
+      }
+
+      // Verificar supervivencia antes de aplicar
+      const { survive, overrideDmg } = checkSurvival(state, target, netDmg)
+      target.currentHp = Math.max(0, target.currentHp - overrideDmg)
+      result.damage = overrideDmg
+
+      if (!survive && target.currentHp <= 0) {
+        target.isDead = true
+        result.died = true
+        applyOnDeathHooks(state, target)
+      }
+
+      // Si fue crítico: chain lightning y llamarada
+      if (isCrit) {
+        applyOnCritReceivedHooks(state, target)
+        applyChainLightning(state, actor, finalDamage)
+        result.effect = (result.effect ? result.effect + ', ' : '') + 'Crítico'
+      }
     }
 
-    // Verificar supervivencia antes de aplicar
-    const { survive, overrideDmg } = checkSurvival(state, target, netDmg)
-    target.currentHp = Math.max(0, target.currentHp - overrideDmg)
-    result.damage = overrideDmg
-
-    if (!survive && target.currentHp <= 0) {
-      target.isDead = true
-      result.died = true
-      applyOnDeathHooks(state, target)
+    // DoT: apply poison/dot effect after damage
+    if (ability.effect.dot) {
+      target.effects.push({ type: 'dot', value: ability.effect.dot.damage, turnsRemaining: ability.effect.dot.turns })
+      result.effect = (result.effect ? result.effect + ', ' : '') + `Veneno ${ability.effect.dot.turns}t`
     }
 
-    // Si fue crítico: chain lightning y llamarada
-    if (isCrit) {
-      applyOnCritReceivedHooks(state, target)
-      applyChainLightning(state, actor, finalDamage)
-      result.effect = 'Crítico'
+    // LifeSteal: heal actor for a fraction of damage dealt
+    if (ability.effect.lifeSteal && result.damage) {
+      const stolen = Math.round(result.damage * ability.effect.lifeSteal)
+      actor.currentHp = Math.min(actor.maxHp, actor.currentHp + stolen)
+      result.effect = (result.effect ? result.effect + ', ' : '') + `+${stolen} HP`
+    }
+
+    // StunChance: random chance to stun after dealing damage
+    if (ability.effect.stunChance && Math.random() < ability.effect.stunChance) {
+      const hasImmunity = target.equippedPassives?.some(id => ABILITY_BY_ID[id]?.effect.immunity === 'stun')
+      if (!hasImmunity) {
+        target.effects.push({ type: 'stun', value: 1, turnsRemaining: 1 })
+        result.stun = 1
+      }
     }
 
     // Singularidad de Plasma
     trySingularidadPlasma(state, actor, target)
+  }
+
+  // Shield (target: self) — handled outside damage block
+  if (ability.effect.shield) {
+    actor.shieldHp = (actor.shieldHp ?? 0) + ability.effect.shield
+    result.effect = `+${ability.effect.shield} escudo`
   }
 
   // Curación
@@ -849,7 +991,8 @@ function resolveAction(
   if (ability.effect.stun && !result.blocked) {
     const defAura = state.auras.find(a => a.side === target.side)
     const stunResist = defAura?.effect.stunResist ?? 0
-    if (!stunResist || Math.random() >= stunResist) {
+    const hasStunImmunity = target.equippedPassives?.some(id => ABILITY_BY_ID[id]?.effect.immunity === 'stun')
+    if (!hasStunImmunity && (!stunResist || Math.random() >= stunResist)) {
       target.effects.push({ type: 'stun', value: ability.effect.stun, turnsRemaining: ability.effect.stun })
       result.stun = ability.effect.stun
     }
@@ -858,13 +1001,16 @@ function resolveAction(
   // Debuffs
   if (ability.effect.debuff && !result.blocked) {
     const { stat, pct, turns } = ability.effect.debuff
-    // Ojo de la Tormenta: 20% de reflejar el debuff
-    tryReflectDebuff(state, target, actor, ability.effect.debuff)
-    target.effects.push({ type: 'debuff', stat, value: pct, turnsRemaining: turns })
-    if (stat === 'agility') {
-      target.effectiveAgility = Math.round(target.effectiveAgility * (1 + pct))
+    const hasDebuffImmunity = target.equippedPassives?.some(id => ABILITY_BY_ID[id]?.effect.immunity === 'debuff')
+    if (!hasDebuffImmunity) {
+      // Ojo de la Tormenta: 20% de reflejar el debuff
+      tryReflectDebuff(state, target, actor, ability.effect.debuff)
+      target.effects.push({ type: 'debuff', stat, value: pct, turnsRemaining: turns })
+      if (stat === 'agility') {
+        target.effectiveAgility = Math.round(target.effectiveAgility * (1 + pct))
+      }
+      result.effect = `${stat} ${pct > 0 ? '+' : ''}${Math.round(pct * 100)}% por ${turns} turnos`
     }
-    result.effect = `${stat} ${pct > 0 ? '+' : ''}${Math.round(pct * 100)}% por ${turns} turnos`
   }
 
   // Buffs
@@ -907,8 +1053,12 @@ function defSideHealBonus(state: BattleState, target: TurnSlot): number {
 
 function getReflectPct(target: TurnSlot): number {
   let pct = 0
-  if (target.equippedAbilities.includes('for_espinas')) pct += 0.15
-  if (target.equippedAbilities.includes('vol_aura'))    pct += 0.20
+  for (const id of (target.equippedPassives ?? [])) {
+    const ab = ABILITY_BY_ID[id]
+    if (!ab) continue
+    if (ab.effect.thorns) pct += ab.effect.thorns
+    if (ab.effect.reflect) pct += ab.effect.reflect
+  }
   return pct
 }
 
@@ -937,10 +1087,42 @@ function resolveTargets(
   return enemies.length > 0 ? [enemies[0]] : []
 }
 
-function advanceTurn(state: BattleState) {
+export function advanceTurn(state: BattleState) {
+  if (state.frontliner) {
+    // 1v1: alternate between frontliners
+    const current = state.slots[state.turnIndex]
+    const otherSide = current?.side === 'attacker' ? 'defender' : 'attacker'
+    const otherFrontierId = state.frontliner[otherSide]
+    const nextIdx = state.slots.findIndex(s => s.therianId === otherFrontierId && !s.isDead)
+    if (nextIdx >= 0) {
+      if (nextIdx <= state.turnIndex) state.round++
+      state.turnIndex = nextIdx
+    }
+    // If nextIdx === -1: other frontliner is dead → phase will be set by resolveTurn
+    return
+  }
+  // Original 3v3 round-robin logic
   const next = nextAliveIndex(state, state.turnIndex)
   if (next <= state.turnIndex) state.round++
   state.turnIndex = next
+}
+
+/** Aplica un cambio de frontliner para el lado indicado y ajusta turnIndex si es necesario. */
+export function applyFrontlinerSwitch(
+  state: BattleState,
+  side: 'attacker' | 'defender',
+  therianId: string,
+): void {
+  if (!state.frontliner) return
+  const slot = state.slots.find(s => s.therianId === therianId && s.side === side && !s.isDead)
+  if (!slot) return
+  state.frontliner[side] = therianId
+  // If it's this side's turn, update turnIndex to the new frontliner
+  const current = state.slots[state.turnIndex]
+  if (current?.side === side) {
+    const newIdx = state.slots.findIndex(s => s.therianId === therianId)
+    if (newIdx >= 0) state.turnIndex = newIdx
+  }
 }
 
 function decrementCooldowns(slot: TurnSlot) {
@@ -962,8 +1144,8 @@ function decrementEffects(slot: TurnSlot) {
   slot.effects = slot.effects.filter(e => e.turnsRemaining > 0)
 }
 
-function hasConductividad(slot: TurnSlot): boolean {
-  return slot.equippedAbilities.includes('ele_cond')
+export function hasConductividad(slot: TurnSlot): boolean {
+  return (slot.equippedPassives ?? []).includes('ele_cond')
 }
 
 // ─── Helpers de consulta ──────────────────────────────────────────────────────

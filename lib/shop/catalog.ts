@@ -1,4 +1,4 @@
-export type ShopItemType = 'cosmetic' | 'service' | 'slot' | 'rune'
+export type ShopItemType = 'cosmetic' | 'service' | 'slot' | 'rune' | 'ability'
 
 export interface ShopItem {
   id: string
@@ -11,6 +11,9 @@ export interface ShopItem {
   accessoryId?: string
   slot?: string // accessory slot ID (orejas | cola | ojos | cabeza | anteojos | garras)
   runeId?: string
+  abilityId?: string
+  abilityType?: 'active' | 'passive'
+  archetype?: string
   tier?: 1 | 2 | 3 | 4 | 5
 }
 
@@ -108,6 +111,58 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'rune_ins_t3', name: 'Runa de Instinto III',  emoji: '🌌', description: '+3 Instinto. Nada escapa a tu atención.',                costGold: 0, costCoin: 50, type: 'rune', runeId: 'rune_ins_t3', tier: 3 },
   { id: 'rune_cha_t3', name: 'Runa de Carisma III',   emoji: '✨', description: '+3 Carisma. Convences sin esfuerzo.',                   costGold: 0, costCoin: 50, type: 'rune', runeId: 'rune_cha_t3', tier: 3 },
   { id: 'rune_all_t3', name: 'Runa de Equilibrio III',emoji: '🔮', description: '+3 a todos los stats. La unión de todas las fuerzas.',  costGold: 0, costCoin: 150, type: 'rune', runeId: 'rune_all_t3', tier: 3 },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 🌿 HABILIDADES FORESTAL
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'ab_for_regen',       name: 'Regeneración',        emoji: '🌿', description: 'Se cura a sí mismo con energía forestal.',             costGold: 300, costCoin: 0, type: 'ability', abilityId: 'for_regen',      abilityType: 'active',  archetype: 'forestal' },
+  { id: 'ab_for_enred',       name: 'Enredadera',          emoji: '🌿', description: 'Reduce la agilidad del rival con raíces.',             costGold: 400, costCoin: 0, type: 'ability', abilityId: 'for_enred',      abilityType: 'active',  archetype: 'forestal' },
+  { id: 'ab_for_latigo',      name: 'Látigo de Raíz',      emoji: '🌿', description: 'Golpe potente con raíces endurecidas.',                costGold: 400, costCoin: 0, type: 'ability', abilityId: 'for_latigo',     abilityType: 'active',  archetype: 'forestal' },
+  { id: 'ab_for_cura_salvaje',name: 'Cura Salvaje',        emoji: '🌿', description: 'Curación poderosa de energía silvestre.',              costGold: 350, costCoin: 0, type: 'ability', abilityId: 'for_cura_salvaje',abilityType: 'active', archetype: 'forestal' },
+  { id: 'ab_for_veneno',      name: 'Mordedura Venenosa',  emoji: '🌿', description: 'Daño inicial + veneno que dura varios turnos.',        costGold: 500, costCoin: 0, type: 'ability', abilityId: 'for_veneno',     abilityType: 'active',  archetype: 'forestal' },
+  { id: 'ab_for_drenar',      name: 'Drenar Vida',         emoji: '🌿', description: 'Roba vida del rival con cada golpe.',                  costGold: 600, costCoin: 0, type: 'ability', abilityId: 'for_drenar',     abilityType: 'active',  archetype: 'forestal' },
+  { id: 'ab_for_espinas',     name: 'Espinas',             emoji: '🌿', description: 'Refleja parte del daño recibido al atacante.',         costGold: 700, costCoin: 0, type: 'ability', abilityId: 'for_espinas',    abilityType: 'passive', archetype: 'forestal' },
+  { id: 'ab_for_raices',      name: 'Raíces Profundas',    emoji: '🌿', description: 'Se regenera HP al inicio de cada turno.',             costGold: 600, costCoin: 0, type: 'ability', abilityId: 'for_raices',     abilityType: 'passive', archetype: 'forestal' },
+  { id: 'ab_for_resiliencia', name: 'Resiliencia',         emoji: '🌿', description: 'Sobrevive una vez a un golpe fatal con 1 HP.',        costGold: 1000, costCoin: 0, type: 'ability', abilityId: 'for_resiliencia',abilityType: 'passive', archetype: 'forestal' },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚡ HABILIDADES ELÉCTRICO
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'ab_ele_rayo',          name: 'Rayo Paralizante',  emoji: '⚡', description: 'Golpe eléctrico que aturde al rival un turno.',       costGold: 600, costCoin: 0, type: 'ability', abilityId: 'ele_rayo',         abilityType: 'active',  archetype: 'electrico' },
+  { id: 'ab_ele_sobre',         name: 'Sobrecarga',        emoji: '⚡', description: 'Aumenta la propia agilidad temporalmente.',           costGold: 400, costCoin: 0, type: 'ability', abilityId: 'ele_sobre',        abilityType: 'active',  archetype: 'electrico' },
+  { id: 'ab_ele_multirayo',     name: 'Multirayo',         emoji: '⚡', description: 'Tres descargas rápidas en un mismo turno.',           costGold: 500, costCoin: 0, type: 'ability', abilityId: 'ele_multirayo',    abilityType: 'active',  archetype: 'electrico' },
+  { id: 'ab_ele_cortocircuito', name: 'Cortocircuito',     emoji: '⚡', description: 'Reduce drásticamente la agilidad del rival.',        costGold: 500, costCoin: 0, type: 'ability', abilityId: 'ele_cortocircuito',abilityType: 'active',  archetype: 'electrico' },
+  { id: 'ab_ele_tormenta',      name: 'Tormenta Estática', emoji: '⚡', description: 'Golpe fuerte con probabilidad de aturdir.',           costGold: 500, costCoin: 0, type: 'ability', abilityId: 'ele_tormenta',     abilityType: 'active',  archetype: 'electrico' },
+  { id: 'ab_ele_pulso',         name: 'Pulso EMP',         emoji: '⚡', description: 'Reduce el daño del rival durante dos turnos.',        costGold: 500, costCoin: 0, type: 'ability', abilityId: 'ele_pulso',        abilityType: 'active',  archetype: 'electrico' },
+  { id: 'ab_ele_cond',          name: 'Conductividad',     emoji: '⚡', description: 'Actúa primero en empates de agilidad.',               costGold: 800, costCoin: 0, type: 'ability', abilityId: 'ele_cond',         abilityType: 'passive', archetype: 'electrico' },
+  { id: 'ab_ele_estatica',      name: 'Carga Estática',    emoji: '⚡', description: 'Aumenta la probabilidad de crítico.',                 costGold: 700, costCoin: 0, type: 'ability', abilityId: 'ele_estatica',     abilityType: 'passive', archetype: 'electrico' },
+  { id: 'ab_ele_blindaje',      name: 'Blindaje Eléctrico',emoji: '⚡', description: 'Inmune a efectos de aturdimiento.',                  costGold: 900, costCoin: 0, type: 'ability', abilityId: 'ele_blindaje',     abilityType: 'passive', archetype: 'electrico' },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 💧 HABILIDADES ACUÁTICO
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'ab_acu_marea',          name: 'Marea Curativa',    emoji: '💧', description: 'Cura a un aliado con energía del agua.',             costGold: 400, costCoin: 0, type: 'ability', abilityId: 'acu_marea',         abilityType: 'active',  archetype: 'acuatico' },
+  { id: 'ab_acu_corriente',      name: 'Corriente Gélida',  emoji: '💧', description: 'Golpe de agua que ralentiza al rival.',             costGold: 500, costCoin: 0, type: 'ability', abilityId: 'acu_corriente',     abilityType: 'active',  archetype: 'acuatico' },
+  { id: 'ab_acu_burbuja',        name: 'Burbuja Escudo',    emoji: '💧', description: 'Crea un escudo de agua que absorbe daño.',          costGold: 500, costCoin: 0, type: 'ability', abilityId: 'acu_burbuja',       abilityType: 'active',  archetype: 'acuatico' },
+  { id: 'ab_acu_helar',          name: 'Congelamiento',     emoji: '💧', description: 'Congela al rival, reduciendo drásticamente su agi.',costGold: 700, costCoin: 0, type: 'ability', abilityId: 'acu_helar',         abilityType: 'active',  archetype: 'acuatico' },
+  { id: 'ab_acu_absorber',       name: 'Absorber',          emoji: '💧', description: 'Curación poderosa de energía acuática.',            costGold: 600, costCoin: 0, type: 'ability', abilityId: 'acu_absorber',      abilityType: 'active',  archetype: 'acuatico' },
+  { id: 'ab_acu_presion',        name: 'Presión Hidráulica',emoji: '💧', description: 'Golpe que reduce el daño del rival progresivamente.',costGold: 400, costCoin: 0, type: 'ability', abilityId: 'acu_presion',       abilityType: 'active',  archetype: 'acuatico' },
+  { id: 'ab_acu_fluid',          name: 'Fluidez',           emoji: '💧', description: 'Reduce el daño entrante en un 15%.',                costGold: 800, costCoin: 0, type: 'ability', abilityId: 'acu_fluid',         abilityType: 'passive', archetype: 'acuatico' },
+  { id: 'ab_acu_escama',         name: 'Escamas de Hielo',  emoji: '💧', description: 'Devuelve parte del daño recibido.',                 costGold: 600, costCoin: 0, type: 'ability', abilityId: 'acu_escama',        abilityType: 'passive', archetype: 'acuatico' },
+  { id: 'ab_acu_corrientevida',  name: 'Corriente de Vida', emoji: '💧', description: 'Regenera HP al inicio de cada turno.',             costGold: 700, costCoin: 0, type: 'ability', abilityId: 'acu_corrientevida', abilityType: 'passive', archetype: 'acuatico' },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 🔥 HABILIDADES VOLCÁNICO
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'ab_vol_intim',     name: 'Intimidar',           emoji: '🔥', description: 'Reduce el daño del rival con presencia ígnea.',       costGold: 400, costCoin: 0, type: 'ability', abilityId: 'vol_intim',    abilityType: 'active',  archetype: 'volcanico' },
+  { id: 'ab_vol_ejecucion', name: 'Ejecución Ígnea',     emoji: '🔥', description: 'Golpe letal con daño ×2 si el rival tiene poca vida.',costGold: 1000, costCoin: 0, type: 'ability', abilityId: 'vol_ejecucion',abilityType: 'active',  archetype: 'volcanico' },
+  { id: 'ab_vol_golpe',     name: 'Golpe Magmático',     emoji: '🔥', description: 'Golpe volcánico de alta potencia.',                  costGold: 600, costCoin: 0, type: 'ability', abilityId: 'vol_golpe',    abilityType: 'active',  archetype: 'volcanico' },
+  { id: 'ab_vol_quemadura', name: 'Quemadura Profunda',  emoji: '🔥', description: 'Inflama al rival, causando daño por varios turnos.', costGold: 500, costCoin: 0, type: 'ability', abilityId: 'vol_quemadura',abilityType: 'active',  archetype: 'volcanico' },
+  { id: 'ab_vol_explosion', name: 'Explosión Controlada',emoji: '🔥', description: 'Explosión rápida de daño volcánico.',                costGold: 400, costCoin: 0, type: 'ability', abilityId: 'vol_explosion',abilityType: 'active',  archetype: 'volcanico' },
+  { id: 'ab_vol_lava',      name: 'Lluvia de Lava',      emoji: '🔥', description: 'Golpe que también debilita el daño del rival.',       costGold: 500, costCoin: 0, type: 'ability', abilityId: 'vol_lava',     abilityType: 'active',  archetype: 'volcanico' },
+  { id: 'ab_vol_aura',      name: 'Aura Ígnea',          emoji: '🔥', description: 'Aura ardiente que daña a quien te ataque.',          costGold: 800, costCoin: 0, type: 'ability', abilityId: 'vol_aura',     abilityType: 'passive', archetype: 'volcanico' },
+  { id: 'ab_vol_berserker', name: 'Berserker',           emoji: '🔥', description: 'Aumenta la probabilidad de golpe crítico.',          costGold: 700, costCoin: 0, type: 'ability', abilityId: 'vol_berserker',abilityType: 'passive', archetype: 'volcanico' },
+  { id: 'ab_vol_nucleo',    name: 'Núcleo Ardiente',     emoji: '🔥', description: 'Inmune a efectos de debilitamiento.',                costGold: 1000, costCoin: 0, type: 'ability', abilityId: 'vol_nucleo',   abilityType: 'passive', archetype: 'volcanico' },
 ]
 
 export function getShopItem(id: string): ShopItem | undefined {

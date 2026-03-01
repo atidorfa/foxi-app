@@ -57,6 +57,7 @@ export default function MissionsPanel() {
       })
       if (res.ok) {
         setCongrats({ title: m.title, rewardLabel: m.rewardLabel })
+        window.dispatchEvent(new Event('wallet-update'))
         await fetchMissions()
         router.refresh()
       }

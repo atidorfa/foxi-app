@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { getShopItem, getSlotCost } from '@/lib/shop/catalog'
 import { EGG_BY_ID } from '@/lib/items/eggs'
 import { toTherianDTO } from '@/lib/therian-dto'
+import { RARITY_ORDER } from '@/lib/generation/engine'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -51,6 +52,23 @@ export async function POST(req: NextRequest) {
         { error: 'INSUFFICIENT_COIN', available: user.essence, required: totalCost },
         { status: 400 }
       )
+    }
+
+    // Validate rarity requirement: must own at least one therian of the next rarity to buy this egg
+    const eggRarityIdx = RARITY_ORDER.indexOf(egg.rarity as typeof RARITY_ORDER[number])
+    const requiredRarity = eggRarityIdx !== -1 && eggRarityIdx < RARITY_ORDER.length - 1
+      ? RARITY_ORDER[eggRarityIdx + 1]
+      : null
+    if (requiredRarity) {
+      const hasRequired = await db.therian.count({
+        where: { userId: session.user.id, rarity: requiredRarity },
+      })
+      if (hasRequired === 0) {
+        return NextResponse.json(
+          { error: 'RARITY_REQUIREMENT_NOT_MET', required: requiredRarity, eggRarity: egg.rarity },
+          { status: 403 }
+        )
+      }
     }
 
     // Deduct currency — explicit to avoid silent no-op if currency value is unrecognized
@@ -169,6 +187,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       newBalance: { gold: updatedUserRune.gold, essence: updatedUserRune.essence, therianSlots: updatedUserRune.therianSlots },
+    })
+  }
+
+  if (item.type === 'ability' && item.abilityId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dba = db as any
+    const deductAbility: Record<string, unknown> = {}
+    if (item.costGold > 0) deductAbility.gold = { decrement: item.costGold }
+    if (effectiveCostCoin > 0) deductAbility.essence = { decrement: effectiveCostCoin }
+
+    const [, updatedUserAbility] = await dba.$transaction([
+      dba.userAbilityInventory.upsert({
+        where: { userId_abilityId: { userId: session.user.id, abilityId: item.abilityId } },
+        update: { quantity: { increment: 1 } },
+        create: { id: randomUUID(), userId: session.user.id, abilityId: item.abilityId, quantity: 1 },
+      }),
+      dba.user.update({
+        where: { id: session.user.id },
+        data: deductAbility,
+        select: { gold: true, essence: true, therianSlots: true },
+      }),
+    ])
+
+    return NextResponse.json({
+      success: true,
+      newBalance: {
+        gold: updatedUserAbility.gold,
+        essence: updatedUserAbility.essence,
+        therianSlots: updatedUserAbility.therianSlots,
+      },
     })
   }
 

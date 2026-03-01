@@ -15,7 +15,7 @@ import { RUNES, type Rune } from '@/lib/catalogs/runes'
 import { TRAITS } from '@/lib/catalogs/traits'
 import { ACCESSORY_SLOTS } from '@/lib/items/accessory-slots'
 import { SHOP_ITEMS } from '@/lib/shop/catalog'
-import { ABILITIES, INNATE_BY_ARCHETYPE } from '@/lib/pvp/abilities'
+import { ABILITIES, ABILITY_BY_ID, INNATE_BY_ARCHETYPE } from '@/lib/pvp/abilities'
 
 interface Props {
   therian: TherianDTO
@@ -97,10 +97,31 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
       .finally(() => setLoadingOwnedRunes(false))
   }, [therian.id])
 
-  // PvP Abilities
-  const [pendingAbilities, setPendingAbilities] = useState<string[]>(therian.equippedAbilities ?? [])
+  // PvP Abilities — filter out any corrupted IDs where type doesn't match the slot
+  const initActives  = (ids: string[]) => ids.filter(id => ABILITY_BY_ID[id]?.type === 'active')
+  const initPassives = (ids: string[]) => ids.filter((id: string) => ABILITY_BY_ID[id]?.type === 'passive')
+
+  const [pendingAbilities, setPendingAbilities] = useState<string[]>(() => initActives(therian.equippedAbilities ?? []))
+  const [pendingPassives, setPendingPassives]   = useState<string[]>(() => initPassives((therian as any).equippedPassives ?? []))
   const [savingAbilities, setSavingAbilities] = useState(false)
   const [abilitiesError, setAbilitiesError] = useState<string | null>(null)
+  const [abilityInventory, setAbilityInventory] = useState<Record<string, { quantity: number; equippedIn: string[] }> | null>(null)
+
+  // Sync pending abilities when the therian ID changes (e.g. switching between therians)
+  useEffect(() => {
+    setPendingAbilities(initActives(therian.equippedAbilities ?? []))
+    setPendingPassives(initPassives((therian as any).equippedPassives ?? []))
+  }, [therian.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadAbilityInventory = useCallback(() => {
+    fetch('/api/user/abilities')
+      .then(r => r.ok ? r.json() : { inventory: [] })
+      .then(data => {
+        const map: Record<string, { quantity: number; equippedIn: string[] }> = {}
+        for (const item of (data.inventory ?? [])) map[item.abilityId] = { quantity: item.quantity, equippedIn: item.equippedIn }
+        setAbilityInventory(map)
+      })
+  }, [])
 
   // Accessories panel (left side)
   const [showAccessories, setShowAccessories] = useState(false)
@@ -203,6 +224,10 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
   }, [])
 
   const openAccessoriesPanel = () => {
+    // Lazy-load ability inventory on first open
+    if (!showAccessories && abilityInventory === null) {
+      loadAbilityInventory()
+    }
     if (!showAccessories && ownedAccessories === null && !loadingAccessories) {
       setLoadingAccessories(true)
       fetch('/api/inventory')
@@ -252,12 +277,22 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
       const res = await fetch('/api/therian/equip-abilities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ therianId: therian.id, abilityIds: pendingAbilities }),
+        body: JSON.stringify({ therianId: therian.id, abilityIds: pendingAbilities, passiveIds: pendingPassives }),
       })
       const data = await res.json()
-      if (!res.ok) { setAbilitiesError(data.error ?? 'Error al guardar.'); return }
-      setTherian(prev => ({ ...prev, equippedAbilities: pendingAbilities }))
+      if (!res.ok) {
+        const MSG: Record<string, string> = {
+          NOT_ENOUGH_COPIES: 'No tenés suficientes copias de esa habilidad.',
+          PASSIVE_IN_ACTIVE_SLOT: 'Una pasiva no puede ir en slot activo.',
+          ACTIVE_IN_PASSIVE_SLOT: 'Una activa no puede ir en slot pasivo.',
+        }
+        setAbilitiesError(MSG[data.error] ?? data.error ?? 'Error al guardar.')
+        return
+      }
+      setTherian(prev => ({ ...prev, equippedAbilities: pendingAbilities, equippedPassives: pendingPassives } as any))
       window.dispatchEvent(new CustomEvent('therian-updated', { detail: { ...therian, equippedAbilities: pendingAbilities } }))
+      // Refresh inventory counts after equipping (reload directly — don't null-out while panel is open)
+      loadAbilityInventory()
     } catch {
       setAbilitiesError('Error de conexión.')
     } finally {
@@ -269,6 +304,14 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
     setPendingAbilities(prev => {
       if (prev.includes(id)) return prev.filter(a => a !== id)
       if (prev.length >= 3) return prev
+      return [...prev, id]
+    })
+  }
+
+  function togglePassive(id: string) {
+    setPendingPassives(prev => {
+      if (prev.includes(id)) return prev.filter(p => p !== id)
+      if (prev.length >= 2) return prev
       return [...prev, id]
     })
   }
@@ -544,10 +587,11 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
 
           {/* PvP Abilities */}
           {(() => {
-            const archetype = therian.trait.id
+            const archetype = ((therian as any).archetype ?? therian.trait.id) as import('@/lib/pvp/types').Archetype
             const innate = INNATE_BY_ARCHETYPE[archetype]
-            const archAbilities = ABILITIES.filter(a => a.archetype === archetype)
-            if (archAbilities.length === 0) return null
+            const activeAbilities  = ABILITIES.filter(a => a.archetype === archetype && a.type === 'active')
+            const passiveAbilities = ABILITIES.filter(a => a.archetype === archetype && a.type === 'passive')
+            if (activeAbilities.length === 0 && passiveAbilities.length === 0) return null
             const ARCH_COLORS: Record<string, { text: string; border: string; bg: string }> = {
               forestal:  { text: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' },
               electrico: { text: 'text-yellow-400',  border: 'border-yellow-500/30',  bg: 'bg-yellow-500/10' },
@@ -555,10 +599,52 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
               volcanico: { text: 'text-orange-400',  border: 'border-orange-500/30',  bg: 'bg-orange-500/10' },
             }
             const colors = ARCH_COLORS[archetype] ?? ARCH_COLORS.forestal
-            const hasPendingChange = JSON.stringify([...pendingAbilities].sort()) !== JSON.stringify([...(therian.equippedAbilities ?? [])].sort())
+            const hasPendingChange =
+              JSON.stringify([...pendingAbilities].sort()) !== JSON.stringify([...(therian.equippedAbilities ?? [])].sort()) ||
+              JSON.stringify([...pendingPassives].sort())  !== JSON.stringify([...((therian as any).equippedPassives ?? [])].sort())
+
+            function AbilityRow({ ab, isOn, canToggle, onToggle }: { ab: (typeof ABILITIES)[0]; isOn: boolean; canToggle: boolean; onToggle: () => void }) {
+              const inv = abilityInventory?.[ab.id]
+              const owned = inv?.quantity ?? 0
+              const equippedElsewhere = (inv?.equippedIn ?? []).filter(id => id !== therian.id).length
+              const available = owned - equippedElsewhere
+              const notOwned = owned === 0
+              const noStock  = !isOn && available < 1
+              const disabled = !canToggle || noStock
+
+              return (
+                <button
+                  onClick={() => !disabled && onToggle()}
+                  disabled={disabled}
+                  className={`w-full flex items-center justify-between rounded-lg border px-2 py-1.5 text-left transition-all ${
+                    isOn
+                      ? `${colors.border} ${colors.bg}`
+                      : disabled
+                        ? 'border-white/5 bg-white/2 opacity-30 cursor-not-allowed'
+                        : 'border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <span className={`text-[10px] font-semibold ${isOn ? colors.text : notOwned ? 'text-white/25' : 'text-white/50'}`}>{ab.name}</span>
+                    {abilityInventory !== null && (
+                      <span className={`ml-1.5 text-[9px] ${owned > 0 ? 'text-white/30' : 'text-white/15'}`}>
+                        {notOwned ? '—' : noStock && !isOn ? 'sin stock' : `×${available}`}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isOn ? 'border-white/50 bg-white/20' : 'border-white/20'}`}>
+                    {isOn && <span className={`text-[9px] font-bold ${colors.text}`}>✓</span>}
+                  </div>
+                </button>
+              )
+            }
+
             return (
               <div className="space-y-2 pt-3 border-t border-white/8">
-                <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold">Habilidades PvP</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[#8B84B0] text-xs uppercase tracking-widest font-semibold">Habilidades PvP</h3>
+                  <a href="/spellbook" className="text-[9px] text-white/25 hover:text-white/50 transition-colors">📖 Libro</a>
+                </div>
                 {innate && (
                   <div>
                     <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1">Innato</p>
@@ -568,37 +654,39 @@ export default function TherianCard({ therian: initialTherian, rank, slots = 1 }
                     </div>
                   </div>
                 )}
+
+                {/* Active abilities */}
                 <div>
-                  <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1">Equipables ({pendingAbilities.length}/3)</p>
+                  <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1">Activas ({pendingAbilities.length}/3)</p>
                   <div className="space-y-1">
-                    {archAbilities.map(ab => {
-                      const isOn = pendingAbilities.includes(ab.id)
-                      const canToggle = isOn || pendingAbilities.length < 3
-                      return (
-                        <button
-                          key={ab.id}
-                          onClick={() => canToggle && toggleAbility(ab.id)}
-                          disabled={!canToggle}
-                          className={`w-full flex items-center justify-between rounded-lg border px-2 py-1.5 text-left transition-all ${
-                            isOn
-                              ? `${colors.border} ${colors.bg}`
-                              : canToggle
-                                ? 'border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5'
-                                : 'border-white/5 bg-white/2 opacity-30 cursor-not-allowed'
-                          }`}
-                        >
-                          <div>
-                            <span className={`text-[10px] font-semibold ${isOn ? colors.text : 'text-white/50'}`}>{ab.name}</span>
-                            {ab.type === 'passive' && <span className="ml-1 text-[9px] text-white/25 border border-white/15 px-1 rounded">(P)</span>}
-                          </div>
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isOn ? 'border-white/50 bg-white/20' : 'border-white/20'}`}>
-                            {isOn && <span className={`text-[9px] font-bold ${colors.text}`}>✓</span>}
-                          </div>
-                        </button>
-                      )
-                    })}
+                    {activeAbilities.map(ab => (
+                      <AbilityRow
+                        key={ab.id}
+                        ab={ab}
+                        isOn={pendingAbilities.includes(ab.id)}
+                        canToggle={pendingAbilities.includes(ab.id) || pendingAbilities.length < 3}
+                        onToggle={() => toggleAbility(ab.id)}
+                      />
+                    ))}
                   </div>
                 </div>
+
+                {/* Passive abilities */}
+                <div>
+                  <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1">Pasivas ({pendingPassives.length}/2) <span className="text-white/15 normal-case">· auto-activas</span></p>
+                  <div className="space-y-1">
+                    {passiveAbilities.map(ab => (
+                      <AbilityRow
+                        key={ab.id}
+                        ab={ab}
+                        isOn={pendingPassives.includes(ab.id)}
+                        canToggle={pendingPassives.includes(ab.id) || pendingPassives.length < 2}
+                        onToggle={() => togglePassive(ab.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
                 {abilitiesError && <p className="text-red-400 text-[10px] text-center">{abilitiesError}</p>}
                 {hasPendingChange && (
                   <button

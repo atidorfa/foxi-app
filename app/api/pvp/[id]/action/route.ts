@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
-import { resolveTurn, getActiveSlot } from '@/lib/pvp/engine'
-import { aiDecide } from '@/lib/pvp/ai'
+import { resolveTurn, getActiveSlot, applyFrontlinerSwitch, advanceTurn } from '@/lib/pvp/engine'
+import { aiDecide, aiDecideSwitch } from '@/lib/pvp/ai'
 import type { BattleState, TurnSnapshot } from '@/lib/pvp/types'
 import {
   applyMmrChange,
@@ -53,9 +53,94 @@ export async function POST(
   const rng = makeRng(Date.now())
   const snapshots: TurnSnapshot[] = []
 
+  // Track proactive switch per round to avoid infinite loops
+  const proactiveSwitchedRound = { attacker: -1, defender: -1 }
+
+  function makeSlotSnapshot(s: typeof state.slots[0]) {
+    return {
+      therianId:        s.therianId,
+      currentHp:        s.currentHp,
+      maxHp:            s.maxHp,
+      shieldHp:         s.shieldHp,
+      isDead:           s.isDead,
+      effects:          s.effects,
+      cooldowns:        s.cooldowns,
+      effectiveAgility: s.effectiveAgility,
+    }
+  }
+
+  function makeSwitchSnapshot(
+    actorIndex: number,
+    side: 'attacker' | 'defender',
+    outId: string,
+    inId: string,
+    inName: string | null,
+  ): TurnSnapshot {
+    return {
+      actorIndex,
+      turnIndex:  state.turnIndex,
+      round:      state.round,
+      slots:      state.slots.map(makeSlotSnapshot),
+      logEntry: {
+        turn:        state.round,
+        actorId:     inId,
+        actorName:   inName,
+        abilityId:   'switch',
+        abilityName: 'Cambio de Therian',
+        targetIds:   [],
+        results:     [],
+      },
+      status:      state.status,
+      winnerId:    state.winnerId,
+      switchEvent: { side, outId, inId },
+      frontliner:  state.frontliner ? { ...state.frontliner } : undefined,
+      phase:       state.phase,
+    }
+  }
+
   try {
     let safetyCounter = 0
-    while (state.status === 'active' && safetyCounter < 100) {
+    while (state.status === 'active' && safetyCounter < 200) {
+      // ── Handle waiting_*_switch phases (frontliner just died) ────────────
+      if (state.phase === 'waiting_attacker_switch' || state.phase === 'waiting_defender_switch') {
+        const side = state.phase === 'waiting_attacker_switch' ? 'attacker' : 'defender'
+        const outId = state.frontliner![side]
+        // AI picks replacement (best available, or first alive)
+        let newId = aiDecideSwitch(state, side)
+        if (!newId) {
+          const firstAlive = state.slots.find(s => s.side === side && !s.isDead)
+          newId = firstAlive?.therianId ?? null
+        }
+        if (!newId) break  // no one left — should have been caught by victory check
+
+        const inSlot = state.slots.find(s => s.therianId === newId)
+        applyFrontlinerSwitch(state, side, newId)
+        state.phase = 'active'
+        advanceTurn(state)
+        snapshots.push(makeSwitchSnapshot(state.turnIndex, side, outId, newId, inSlot?.name ?? null))
+        safetyCounter++
+        continue
+      }
+
+      // ── Proactive switch: before acting, check type disadvantage ─────────
+      if (state.frontliner) {
+        const actor = getActiveSlot(state)
+        const actorSide = actor.side
+        if (proactiveSwitchedRound[actorSide] < state.round) {
+          const switchId = aiDecideSwitch(state, actorSide)
+          if (switchId) {
+            const outId = state.frontliner[actorSide]
+            const inSlot = state.slots.find(s => s.therianId === switchId)
+            proactiveSwitchedRound[actorSide] = state.round
+            applyFrontlinerSwitch(state, actorSide, switchId)
+            snapshots.push(makeSwitchSnapshot(state.turnIndex, actorSide, outId, switchId, inSlot?.name ?? null))
+            safetyCounter++
+            continue
+          }
+        }
+      }
+
+      // ── Regular turn ──────────────────────────────────────────────────────
       const actorIndex = state.turnIndex
       const actor   = getActiveSlot(state)
       const allies  = state.slots.filter(s => s.side === actor.side)
@@ -64,24 +149,16 @@ export async function POST(
       const { state: next, entry } = resolveTurn(state, aiAction, rng)
       state = next
 
-      // Capturar snapshot compacto: solo partes mutables por slot
       snapshots.push({
         actorIndex,
-        turnIndex: state.turnIndex,
-        round:     state.round,
-        slots: state.slots.map(s => ({
-          therianId:        s.therianId,
-          currentHp:        s.currentHp,
-          maxHp:            s.maxHp,
-          shieldHp:         s.shieldHp,
-          isDead:           s.isDead,
-          effects:          s.effects,
-          cooldowns:        s.cooldowns,
-          effectiveAgility: s.effectiveAgility,
-        })),
-        logEntry: entry,
-        status:   state.status,
-        winnerId: state.winnerId,
+        turnIndex:  state.turnIndex,
+        round:      state.round,
+        slots:      state.slots.map(makeSlotSnapshot),
+        logEntry:   entry,
+        status:     state.status,
+        winnerId:   state.winnerId,
+        frontliner: state.frontliner ? { ...state.frontliner } : undefined,
+        phase:      state.phase,
       })
 
       safetyCounter++

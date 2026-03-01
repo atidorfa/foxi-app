@@ -41,6 +41,7 @@ model User {
   verificationTokens VerificationToken[]
   inventoryItems     InventoryItem[]
   userRuneInventory  UserRuneInventory[]
+  abilityInventory   UserAbilityInventory[]
 }
 
 model VerificationToken {
@@ -75,7 +76,8 @@ model Therian {
   lastBiteAt  DateTime?
   accessories       String    @default("[]") @db.Text
   status            String    @default("active") // "active" | "capsule"
-  equippedAbilities String    @default("[]") @db.Text // JSON: string[] ability IDs, max 4
+  equippedAbilities String    @default("[]") @db.Text // JSON: active ability IDs, max 3
+  equippedPassives  String    @default("[]") @db.Text // JSON: passive ability IDs, max 2
   auraId            String?   // ID from lib/catalogs/auras.ts (assigned at generation)
 
   battlesAsChallenger BattleLog[] @relation("Challenger")
@@ -138,6 +140,17 @@ model UserRuneInventory {
   source   String   @default("reward") // "weekly" | "monthly" | "gift"
 
   @@unique([userId, runeId])
+}
+
+model UserAbilityInventory {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  abilityId  String
+  quantity   Int      @default(1)
+  obtainedAt DateTime @default(now())
+
+  @@unique([userId, abilityId])
 }
 
 model InventoryItem {

@@ -102,8 +102,8 @@ export async function POST(req: Request) {
   const [userForPassive, allTherians] = await Promise.all([
     dba.user.findUnique({
       where: { id: session.user.id },
-      select: { lastPassiveClaim: true, level: true, completedCollections: true },
-    }) as Promise<{ lastPassiveClaim: Date | null; level: number; completedCollections: string } | null>,
+      select: { lastPassiveClaim: true, level: true, completedCollections: true, therianSlots: true },
+    }) as Promise<{ lastPassiveClaim: Date | null; level: number; completedCollections: string; therianSlots: number } | null>,
     db.therian.findMany({
       where: { userId: session.user.id },
       select: { rarity: true, createdAt: true, traitId: true },
@@ -163,6 +163,11 @@ export async function POST(req: Request) {
   // Clean up empty inventory slots
   await db.inventoryItem.deleteMany({ where: { userId: session.user.id, quantity: { lte: 0 } } })
 
+  // Determine if the new therian fits in an active slot
+  const activeCount = await db.therian.count({ where: { userId: session.user.id, status: 'active' } })
+  const slots = userForPassive?.therianSlots ?? 1
+  const newStatus = activeCount < slots ? 'active' : 'capsule'
+
   // Generate and persist the result therian
   const secret = process.env.SERVER_SECRET ?? 'therian-hmac-secret-local'
   const generated = generateTherianWithRarity(session.user.id, secret, resultRarity)
@@ -179,6 +184,7 @@ export async function POST(req: Request) {
       traitId:    generated.traitId,
       auraId:     generated.auraId,
       name,
+      status:     newStatus,
     },
   })
 
@@ -187,5 +193,6 @@ export async function POST(req: Request) {
     therian: toTherianDTO(newTherian),
     resultRarity,
     successRate,
+    encapsulated: newStatus === 'capsule',
   })
 }

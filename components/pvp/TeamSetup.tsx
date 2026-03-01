@@ -112,7 +112,7 @@ export default function TeamSetup({ therians, onBattleStart, savedTeamIds, onTea
       const res = await fetch('/api/pvp/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attackerTeamIds: Array.from(selected) }),
+        body: JSON.stringify({ attackerTeamIds: Array.from(selected), mode: 'manual' }),
       })
       let data: Record<string, unknown> = {}
       try { data = await res.json() } catch { /* no-JSON */ }

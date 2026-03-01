@@ -67,7 +67,7 @@ export default function PvpRoom({ therians, activeBattleId, onBattleComplete, on
     fetch('/api/pvp/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ attackerTeamIds: initialTeamIds }),
+      body: JSON.stringify({ attackerTeamIds: initialTeamIds, mode: 'manual' }),
     })
       .then(r => r.json())
       .then(data => {

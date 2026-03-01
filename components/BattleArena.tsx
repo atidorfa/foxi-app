@@ -295,10 +295,12 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
           {/* Challenger side */}
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
-              <div className={`transition-transform duration-200 ${
-                lungeLeft ? 'translate-x-6' : ''
-              } ${shakeLeft ? 'animate-[shake_0.3s_ease]' : ''}`}>
-                <TherianAvatar therian={challenger} size={100} animated={phase === 'intro'} />
+              {/* Lunge (outer) and shake (inner) on separate layers to avoid transform conflicts */}
+              <div className={`transition-transform duration-[180ms] ease-out ${lungeLeft ? 'translate-x-6' : ''}`}
+                style={{ willChange: 'transform' }}>
+                <div className={shakeLeft ? 'animate-[shake_0.28s_ease]' : ''}>
+                  <TherianAvatar therian={challenger} size={100} animated={phase === 'intro'} />
+                </div>
               </div>
               {/* Floating texts on challenger */}
               {floatingTexts.filter(f => f.side === 'left').map(f => (
@@ -323,10 +325,11 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
           {/* Target side */}
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
-              <div className={`transition-transform duration-200 ${
-                lungeRight ? '-translate-x-6' : ''
-              } ${shakeRight ? 'animate-[shake_0.3s_ease]' : ''}`}>
-                <TherianAvatar therian={target} size={100} animated={phase === 'intro'} />
+              <div className={`transition-transform duration-[180ms] ease-out ${lungeRight ? '-translate-x-6' : ''}`}
+                style={{ willChange: 'transform' }}>
+                <div className={shakeRight ? 'animate-[shake_0.28s_ease]' : ''}>
+                  <TherianAvatar therian={target} size={100} animated={phase === 'intro'} />
+                </div>
               </div>
               {floatingTexts.filter(f => f.side === 'right').map(f => (
                 <div key={f.id} className="absolute -top-6 left-1/2 -translate-x-1/2 text-sm font-bold animate-[floatUp_1s_ease_forwards] whitespace-nowrap pointer-events-none"
@@ -409,8 +412,9 @@ export default function BattleArena({ challenger, target, result, onComplete }: 
         }
         @keyframes shake {
           0%,100% { transform: translateX(0); }
-          25%      { transform: translateX(-5px); }
-          75%      { transform: translateX(5px); }
+          20%      { transform: translateX(-6px); }
+          50%      { transform: translateX(6px); }
+          80%      { transform: translateX(-3px); }
         }
         @keyframes resultAppear {
           0%   { opacity: 0; transform: scale(0.88) translateY(10px); }

@@ -70,7 +70,7 @@ const makeTeam = (
       agility: 55,
       instinct: 40,
       charisma: 70,
-      equippedAbilities: ['vol_erup', 'vol_intim'],
+      equippedAbilities: ['vol_golpe', 'vol_intim'],
     },
     {
       therianId: `${side}-2`,
@@ -262,22 +262,21 @@ section('6. Cooldowns de habilidades')
 
 {
   const state = initBattleState(makeTeam('a'), makeTeam('b'))
-  // Buscar un slot attacker que tenga vol_erup
-  const actor = state.slots.find(s => s.equippedAbilities.includes('vol_erup') && s.side === 'attacker')
+  // Buscar un slot attacker que tenga vol_golpe
+  const actor = state.slots.find(s => s.equippedAbilities.includes('vol_golpe') && s.side === 'attacker')
   if (!actor) {
-    console.log('  ~ (skip) No hay slot con vol_erup en attacker')
+    console.log('  ~ (skip) No hay slot con vol_golpe en attacker')
   } else {
-    const ability = ABILITY_BY_ID['vol_erup']
-    assert(!!ability, 'vol_erup existe en ABILITY_BY_ID')
+    const ability = ABILITY_BY_ID['vol_golpe']
+    assert(!!ability, 'vol_golpe existe en ABILITY_BY_ID')
     if (ability && ability.cooldown > 0) {
-      // Temporalmente hacer que este slot sea el primero en actuar
       state.turnIndex = state.slots.indexOf(actor)
       const enemies = state.slots.filter(s => s.side !== actor.side && !s.isDead)
       const rng = makeRng(99)
-      resolveTurn(state, { abilityId: 'vol_erup', targetId: enemies[0]?.therianId }, rng)
+      resolveTurn(state, { abilityId: 'vol_golpe', targetId: enemies[0]?.therianId }, rng)
 
       const postActor = state.slots.find(s => s.therianId === actor.therianId)!
-      assert((postActor.cooldowns['vol_erup'] ?? 0) > 0, 'Cooldown se activa tras usar habilidad con cooldown')
+      assert((postActor.cooldowns['vol_golpe'] ?? 0) > 0, 'Cooldown se activa tras usar habilidad con cooldown')
     }
   }
 }
@@ -608,7 +607,7 @@ section('15. Múltiples configuraciones de equipo')
     // Mezclado (mixed archetypes)
     [
       [
-        { therianId: 'mix1', name: 'Fire', archetype: 'volcanico', vitality: 55, agility: 65, instinct: 40, charisma: 90, equippedAbilities: ['vol_erup'] },
+        { therianId: 'mix1', name: 'Fire', archetype: 'volcanico', vitality: 55, agility: 65, instinct: 40, charisma: 90, equippedAbilities: ['vol_golpe'] },
         { therianId: 'mix2', name: 'Leaf', archetype: 'forestal',  vitality: 80, agility: 40, instinct: 70, charisma: 50, equippedAbilities: ['for_regen'] },
         { therianId: 'mix3', name: 'Wave', archetype: 'acuatico',  vitality: 65, agility: 60, instinct: 55, charisma: 60, equippedAbilities: [] },
       ],
@@ -674,8 +673,8 @@ section('17. ABILITY_BY_ID — catálogo de habilidades')
 
 {
   const requiredAbilities = [
-    'vol_erup', 'vol_intim', 'ele_rayo', 'ele_sobre',
-    'for_regen', 'for_espinas', 'acu_marea', 'acu_tsun',
+    'vol_golpe', 'vol_intim', 'ele_rayo', 'ele_sobre',
+    'for_regen', 'for_espinas', 'acu_marea', 'acu_corriente',
   ]
   for (const id of requiredAbilities) {
     const ab = ABILITY_BY_ID[id]

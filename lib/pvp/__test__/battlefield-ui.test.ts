@@ -60,11 +60,13 @@ function makeSlot(overrides: Partial<TurnSlot> = {}): TurnSlot {
     instinct: 20,
     charisma: 20,
     equippedAbilities: [],
+    equippedPassives: [],
     innateAbilityId: 'basic_forestal',
     cooldowns: {},
     effects: [],
     isDead: false,
     shieldHp: 0,
+    endureUsed: false,
     isLeader: false,
     ...overrides,
   }
@@ -143,10 +145,10 @@ section('Phase 1 — describeAbility()')
 }
 
 {
-  const ab = ABILITY_BY_ID['acu_tsun'] // Tsunami: damage 0.6
-  assert(!!ab, 'acu_tsun exists in ABILITY_BY_ID')
+  const ab = ABILITY_BY_ID['acu_corriente'] // Corriente Gélida: damage 1.2 + debuff agility
+  assert(!!ab, 'acu_corriente exists in ABILITY_BY_ID')
   const desc = describeAbility(ab)
-  assert(desc.includes('Daño base ×0.6'), 'Tsunami shows correct damage multiplier')
+  assert(desc.includes('Daño base ×1.2'), 'acu_corriente shows correct damage multiplier')
 }
 
 // Heal abilities
@@ -365,10 +367,10 @@ section('Phase 2 — resultLines()')
   assert(lines[0].includes('Agility reducida 25%'), 'effect text passed through')
 }
 
-// Multi-target AoE — should include total line
+// Multi-target — should include total line
 {
   const entry = makeLogEntry({
-    abilityId: 'vol_erup',
+    abilityId: 'vol_golpe',
     targetIds: ['d1', 'd2', 'd3'],
     results: [
       { targetId: 'd1', targetName: null, blocked: false, damage: 20, died: false },
@@ -383,7 +385,7 @@ section('Phase 2 — resultLines()')
 // Multi-target with some blocked
 {
   const entry = makeLogEntry({
-    abilityId: 'acu_tsun',
+    abilityId: 'acu_burbuja',
     targetIds: ['d1', 'd2'],
     results: [
       { targetId: 'd1', targetName: null, blocked: false, damage: 15, died: false },

@@ -7,6 +7,7 @@ import type { TherianDTO } from '@/lib/therian-dto'
 import { SHOP_ITEMS, getSlotCost } from '@/lib/shop/catalog'
 import { EGGS } from '@/lib/items/eggs'
 import { RUNES } from '@/lib/catalogs/runes'
+import { RARITY_ORDER } from '@/lib/generation/engine'
 
 interface Wallet {
   gold: number
@@ -90,12 +91,17 @@ export default function ShopModal({ therian, therians, wallet, initialTab = 'acc
       })
       const data = await res.json()
       if (!res.ok) {
+        const RARITY_LABEL: Record<string, string> = {
+          COMMON: 'Común', UNCOMMON: 'Poco común', RARE: 'Raro',
+          EPIC: 'Épico', LEGENDARY: 'Legendario', MYTHIC: 'Mítico',
+        }
         const messages: Record<string, string> = {
-          INSUFFICIENT_ESSENCIA: `GOLD insuficiente (necesitas ${data.required}, tienes ${data.available})`,
-          INSUFFICIENT_COIN:     `ESENCIA insuficiente (necesitas ${data.required}, tienes ${data.available})`,
-          NAME_TAKEN:   'Ese nombre ya está en uso.',
-          ALREADY_OWNED:'Ya tienes este accesorio.',
-          NAME_REQUIRED:'Ingresa un nombre.',
+          INSUFFICIENT_ESSENCIA:      `Oro insuficiente (necesitas ${data.required}, tienes ${data.available})`,
+          INSUFFICIENT_COIN:          `Esencia insuficiente (necesitas ${data.required}, tienes ${data.available})`,
+          NAME_TAKEN:                 'Ese nombre ya está en uso.',
+          ALREADY_OWNED:              'Ya tienes este accesorio.',
+          NAME_REQUIRED:              'Ingresa un nombre.',
+          RARITY_REQUIREMENT_NOT_MET: `Necesitas al menos un Therian ${RARITY_LABEL[data.required] ?? data.required} para comprar este huevo.`,
         }
         setError(messages[data.error] ?? 'Error al comprar.')
         return
@@ -266,46 +272,65 @@ export default function ShopModal({ therian, therians, wallet, initialTab = 'acc
             {error && <p className="text-red-400 text-xs text-center italic">{error}</p>}
 
             {/* Tab: Huevos */}
-            {tab === 'huevos' && (
-              <div className="grid grid-cols-3 gap-3">
-                {EGGS.map(egg => {
-                  const isLoadingThis = loading === egg.id
-                  const qty = getEggQty(egg.id)
-                  const totalCost = egg.price * qty
-                  const isGoldEgg = egg.currency === 'gold'
-                  const canAfford = isGoldEgg ? wallet.gold >= totalCost : wallet.essence >= totalCost
-                  const currencyIcon = isGoldEgg ? '🪙' : '💎'
-                  return (
-                    <div key={egg.id} className="rounded-xl border border-white/5 bg-white/3 p-3 flex flex-col gap-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-xl leading-none">{egg.emoji}</span>
-                        <span className="text-[10px] font-mono text-white/50">{egg.price.toLocaleString('es-AR')} {currencyIcon}</span>
+            {tab === 'huevos' && (() => {
+              const ownedRarities = new Set((therians ?? [therian]).map(t => t.rarity))
+              const RARITY_LABEL_EGG: Record<string, string> = {
+                COMMON: 'Común', UNCOMMON: 'Poco común', RARE: 'Raro',
+                EPIC: 'Épico', LEGENDARY: 'Legendario', MYTHIC: 'Mítico',
+              }
+              return (
+                <div className="grid grid-cols-3 gap-3">
+                  {EGGS.map(egg => {
+                    const isLoadingThis = loading === egg.id
+                    const qty = getEggQty(egg.id)
+                    const totalCost = egg.price * qty
+                    const isGoldEgg = egg.currency === 'gold'
+                    const canAfford = isGoldEgg ? wallet.gold >= totalCost : wallet.essence >= totalCost
+                    const currencyIcon = isGoldEgg ? '🪙' : '💎'
+                    const eggRarityIdx = RARITY_ORDER.indexOf(egg.rarity as typeof RARITY_ORDER[number])
+                    const requiredRarity = eggRarityIdx !== -1 && eggRarityIdx < RARITY_ORDER.length - 1
+                      ? RARITY_ORDER[eggRarityIdx + 1]
+                      : null
+                    const rarityLocked = requiredRarity !== null && !ownedRarities.has(requiredRarity)
+                    return (
+                      <div key={egg.id} className={`rounded-xl border p-3 flex flex-col gap-2 ${rarityLocked ? 'border-white/5 bg-white/2 opacity-60' : 'border-white/5 bg-white/3'}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xl leading-none">{rarityLocked ? '🔒' : egg.emoji}</span>
+                          <span className="text-[10px] font-mono text-white/50">{egg.price.toLocaleString('es-AR')} {currencyIcon}</span>
+                        </div>
+                        <div>
+                          <p className="text-white font-semibold text-xs leading-tight">{egg.name}</p>
+                          <p className={`text-[10px] font-semibold ${RARITY_COLOR[egg.rarity]}`}>{RARITY_LABEL_EGG[egg.rarity]}</p>
+                          {rarityLocked && requiredRarity && (
+                            <p className="text-[9px] text-white/30 mt-0.5 italic">
+                              Req. Therian {RARITY_LABEL_EGG[requiredRarity]}
+                            </p>
+                          )}
+                        </div>
+                        {!rarityLocked && (
+                          <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 overflow-hidden">
+                            <button onClick={() => setQty(egg.id, qty - 1)} disabled={qty <= 1} className="px-2 py-1 text-xs text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">−</button>
+                            <span className="text-xs font-mono text-white font-semibold">{qty}</span>
+                            <button onClick={() => setQty(egg.id, qty + 1)} disabled={qty >= 99} className="px-2 py-1 text-xs text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">+</button>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => !rarityLocked && handleBuy(egg.id, qty)}
+                          disabled={isLoadingThis || !canAfford || rarityLocked}
+                          className={`w-full rounded-lg py-1.5 text-[10px] font-semibold transition-all ${
+                            rarityLocked || !canAfford
+                              ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-purple-700 to-purple-500 text-white hover:from-purple-600 hover:to-purple-400'
+                          }`}
+                        >
+                          {isLoadingThis ? '⏳...' : rarityLocked ? '🔒 Bloqueado' : `×${qty} · ${totalCost.toLocaleString('es-AR')} ${currencyIcon}`}
+                        </button>
                       </div>
-                      <div>
-                        <p className="text-white font-semibold text-xs leading-tight">{egg.name}</p>
-                        <p className={`text-[10px] font-semibold ${RARITY_COLOR[egg.rarity]}`}>{egg.rarity.charAt(0) + egg.rarity.slice(1).toLowerCase()}</p>
-                      </div>
-                      <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 overflow-hidden">
-                        <button onClick={() => setQty(egg.id, qty - 1)} disabled={qty <= 1} className="px-2 py-1 text-xs text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">−</button>
-                        <span className="text-xs font-mono text-white font-semibold">{qty}</span>
-                        <button onClick={() => setQty(egg.id, qty + 1)} disabled={qty >= 99} className="px-2 py-1 text-xs text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">+</button>
-                      </div>
-                      <button
-                        onClick={() => handleBuy(egg.id, qty)}
-                        disabled={isLoadingThis || !canAfford}
-                        className={`w-full rounded-lg py-1.5 text-[10px] font-semibold transition-all ${
-                          !canAfford
-                            ? 'bg-white/5 text-white/20 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-purple-700 to-purple-500 text-white hover:from-purple-600 hover:to-purple-400'
-                        }`}
-                      >
-                        {isLoadingThis ? '⏳...' : `×${qty} · ${totalCost.toLocaleString('es-AR')} ${currencyIcon}`}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                    )
+                  })}
+                </div>
+              )
+            })()}
 
             {/* Tab: Accesorios — sub-tabs por slot */}
             {tab === 'accesorios' && (() => {
